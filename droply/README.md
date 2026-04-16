@@ -17,5 +17,12 @@ Base multiplataforma de Flutter + Supabase para el Sprint 1 de infraestructura y
 - Bucket privado: `droply-files`
 - Convencion de Storage: `auth.uid()/folder_or_root/uuid-filename.ext`
 
+## Configuracion OTP por email
+- Activa `Email Auth` en Supabase Auth.
+- Configura la plantilla para enviar OTP por email.
+- Usa `{{ .Token }}` en la plantilla.
+- No uses `{{ .ConfirmationURL }}` si quieres un codigo de 6 digitos en lugar de magic link.
+
 ## Documentacion del sprint
 - Planning y checks Trello: `docs/sprint-1-planning.md`
+- Informe de cierre Sprint 2: `docs/sprint-2-closing-report.md`

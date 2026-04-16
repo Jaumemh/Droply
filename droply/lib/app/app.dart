@@ -1,8 +1,41 @@
-import 'package:droply/features/shell/presentation/infrastructure_home_page.dart';
+import 'package:droply/core/config/env.dart';
+import 'package:droply/features/auth/auth_controller.dart';
+import 'package:droply/features/auth/presentation/auth_gate.dart';
+import 'package:droply/features/auth/supabase_auth_repository.dart';
+import 'package:droply/features/auth/unsupported_auth_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class DroplyApp extends StatelessWidget {
-  const DroplyApp({super.key});
+class DroplyApp extends StatefulWidget {
+  const DroplyApp({
+    super.key,
+    AuthController? authController,
+  }) : _providedController = authController;
+
+  final AuthController? _providedController;
+
+  @override
+  State<DroplyApp> createState() => _DroplyAppState();
+}
+
+class _DroplyAppState extends State<DroplyApp> {
+  late final AuthController _controller;
+  late final bool _ownsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsController = widget._providedController == null;
+    _controller = widget._providedController ?? _createDefaultController();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsController) {
+      _controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +65,40 @@ class DroplyApp extends StatelessWidget {
             side: const BorderSide(color: Color(0xFFDCE4F0)),
           ),
         ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
       ),
-      home: const InfrastructureHomePage(),
+      home: AuthGate(controller: _controller),
     );
+  }
+
+  AuthController _createDefaultController() {
+    if (!EnvConfig.isSupabaseConfigured) {
+      return AuthController(
+        repository: UnsupportedAuthRepository(
+          message:
+              'Configura SUPABASE_URL y SUPABASE_ANON_KEY para usar el login OTP.',
+        ),
+      );
+    }
+
+    try {
+      final client = Supabase.instance.client;
+      return AuthController(
+        repository: SupabaseAuthRepository(client),
+      );
+    } on Object {
+      return AuthController(
+        repository: UnsupportedAuthRepository(
+          message:
+              'Supabase no se ha inicializado correctamente. Revisa la configuracion del entorno.',
+        ),
+      );
+    }
   }
 }
