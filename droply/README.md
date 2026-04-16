@@ -1,16 +1,21 @@
-# droply
+# Droply
 
-A new Flutter project.
+Base multiplataforma de Flutter + Supabase para el Sprint 1 de infraestructura y datos.
 
-## Getting Started
+## Stack
+- Flutter para Android, Web y Desktop
+- Supabase Auth, Postgres y Storage
+- RLS desde el arranque del proyecto
 
-This project is a starting point for a Flutter application.
+## Configuracion rapida
+1. Sustituye los placeholders de `.env.example` o pasa los valores reales con `--dart-define`.
+2. Ejecuta `flutter pub get`.
+3. Lanza la app con `flutter run -d chrome` o el target que necesites.
 
-A few resources to get you started if this is your first Flutter project:
+## Supabase
+- Migracion inicial: `supabase/migrations/0001_sprint1_infra.sql`
+- Bucket privado: `droply-files`
+- Convencion de Storage: `auth.uid()/folder_or_root/uuid-filename.ext`
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Documentacion del sprint
+- Planning y checks Trello: `docs/sprint-1-planning.md`
