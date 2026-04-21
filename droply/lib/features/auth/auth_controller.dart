@@ -10,10 +10,12 @@ class AuthController extends ChangeNotifier {
   AuthController({
     required AuthRepository repository,
     this.resendCooldown = const Duration(seconds: 30),
+    this.requestTimeout = const Duration(seconds: 15),
   }) : _repository = repository;
 
   final AuthRepository _repository;
   final Duration resendCooldown;
+  final Duration requestTimeout;
 
   StreamSubscription<AuthState>? _authSubscription;
   Timer? _resendTimer;
@@ -98,7 +100,7 @@ class AuthController extends ChangeNotifier {
     }
 
     await _runBusyAction(() async {
-      await _repository.sendOtp(normalizedEmail);
+      await _repository.sendOtp(normalizedEmail).timeout(requestTimeout);
       _email = normalizedEmail;
       _status = AuthStatus.otpSent;
       _errorMessage = null;
@@ -129,7 +131,7 @@ class AuthController extends ChangeNotifier {
       final response = await _repository.verifyOtp(
         email: _email,
         token: token,
-      );
+      ).timeout(requestTimeout);
 
       _currentUser =
           response.user ?? response.session?.user ?? _repository.currentUser;
@@ -201,6 +203,9 @@ class AuthController extends ChangeNotifier {
   }
 
   String _readableError(Object error) {
+    if (error is TimeoutException) {
+      return 'La peticion ha tardado demasiado. Revisa tu conexion o intenta de nuevo.';
+    }
     final message = error.toString();
     if (message.contains('Token has expired')) {
       return 'El codigo ha caducado. Solicita uno nuevo.';

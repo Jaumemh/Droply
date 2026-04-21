@@ -3,6 +3,7 @@ import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/auth/presentation/auth_gate.dart';
 import 'package:droply/features/auth/supabase_auth_repository.dart';
 import 'package:droply/features/auth/unsupported_auth_repository.dart';
+import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,9 +11,12 @@ class DroplyApp extends StatefulWidget {
   const DroplyApp({
     super.key,
     AuthController? authController,
-  }) : _providedController = authController;
+    DashboardController? dashboardController,
+  })  : _providedController = authController,
+        _dashboardController = dashboardController;
 
   final AuthController? _providedController;
+  final DashboardController? _dashboardController;
 
   @override
   State<DroplyApp> createState() => _DroplyAppState();
@@ -20,6 +24,7 @@ class DroplyApp extends StatefulWidget {
 
 class _DroplyAppState extends State<DroplyApp> {
   late final AuthController _controller;
+  late final DashboardController? _dashboardController;
   late final bool _ownsController;
 
   @override
@@ -27,6 +32,7 @@ class _DroplyAppState extends State<DroplyApp> {
     super.initState();
     _ownsController = widget._providedController == null;
     _controller = widget._providedController ?? _createDefaultController();
+    _dashboardController = widget._dashboardController;
   }
 
   @override
@@ -73,7 +79,10 @@ class _DroplyAppState extends State<DroplyApp> {
           ),
         ),
       ),
-      home: AuthGate(controller: _controller),
+      home: AuthGate(
+        controller: _controller,
+        dashboardController: _dashboardController,
+      ),
     );
   }
 

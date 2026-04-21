@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:droply/app/app.dart';
 import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/auth/auth_repository.dart';
+import 'package:droply/features/dashboard/data/file_browser_repository.dart';
+import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,10 +14,15 @@ void main() {
     final repository = FakeAuthRepository();
     final controller = AuthController(repository: repository);
 
-    await tester.pumpWidget(DroplyApp(authController: controller));
+    await tester.pumpWidget(
+      DroplyApp(authController: controller, dashboardController: FakeDashboardController()),
+    );
     await tester.pump();
 
-    expect(find.text('Paso 1 de 2. Introduce tu email para recibir un codigo OTP.'), findsOneWidget);
+    expect(
+      find.text('Paso 1 de 2. Introduce tu email para recibir un codigo OTP.'),
+      findsOneWidget,
+    );
 
     await tester.enterText(find.byType(TextField).first, 'jaume@example.com');
     await tester.tap(find.text('Enviar codigo'));
@@ -24,15 +32,18 @@ void main() {
     expect(repository.lastOtpEmail, 'jaume@example.com');
   });
 
-  testWidgets('restores session and shows authenticated dashboard', (tester) async {
+  testWidgets('shows authenticated dashboard with folder and file shell', (tester) async {
     final repository = FakeAuthRepository.authenticated();
     final controller = AuthController(repository: repository);
 
-    await tester.pumpWidget(DroplyApp(authController: controller));
+    await tester.pumpWidget(
+      DroplyApp(authController: controller, dashboardController: FakeDashboardController()),
+    );
     await tester.pump();
 
-    expect(find.text('Dashboard autenticado'), findsOneWidget);
-    expect(find.text('tester@example.com'), findsOneWidget);
+    expect(find.text('Tauler'), findsOneWidget);
+    expect(find.text('Documentos'), findsOneWidget);
+    expect(find.text('informe.pdf'), findsOneWidget);
   });
 }
 
@@ -132,4 +143,90 @@ class FakeAuthRepository implements AuthRepository {
     _currentUser = null;
     _controller.add(const AuthState(AuthChangeEvent.signedOut, null));
   }
+}
+
+class FakeDashboardController extends DashboardController {
+  FakeDashboardController()
+      : super(repository: _FakeFileBrowserRepository());
+}
+
+class _FakeFileBrowserRepository extends FileBrowserRepositoryBase {
+  @override
+  Future<void> createFile({
+    String? folderId,
+    required String name,
+    required String mimeType,
+    required int sizeBytes,
+    String? extension,
+    required String storagePath,
+  }) async {}
+
+  @override
+  Future<void> createFolder({
+    required String name,
+    String? parentId,
+  }) async {}
+
+  @override
+  Future<void> deleteFile({required String fileId}) async {}
+
+  @override
+  Future<void> deleteFolder({required String folderId}) async {}
+
+  @override
+  Future<FileBrowserSnapshot> load({String? folderId}) async {
+    return FileBrowserSnapshot(
+      currentFolderId: folderId,
+      folderPath: const [
+        FolderItem(
+          id: 'folder-root',
+          ownerId: 'owner-id',
+          name: 'Documentos',
+          parentId: null,
+          createdAt: DateTime.utc(2026, 4, 21),
+        ),
+      ],
+      folders: const [
+        FolderItem(
+          id: 'folder-root',
+          ownerId: 'owner-id',
+          name: 'Documentos',
+          parentId: null,
+          createdAt: DateTime.utc(2026, 4, 21),
+        ),
+      ],
+      files: const [
+        FileItem(
+          id: 'file-1',
+          ownerId: 'owner-id',
+          folderId: null,
+          name: 'informe.pdf',
+          extension: 'pdf',
+          sizeBytes: 1024,
+          mimeType: 'application/pdf',
+          storagePath: 'owner-id/informe.pdf',
+          version: 1,
+          isDeleted: false,
+          createdAt: DateTime.utc(2026, 4, 21),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<List<FolderItem>> loadFolderPath(String? folderId) async {
+    return const [];
+  }
+
+  @override
+  Future<void> renameFile({
+    required String fileId,
+    required String newName,
+  }) async {}
+
+  @override
+  Future<void> renameFolder({
+    required String folderId,
+    required String newName,
+  }) async {}
 }

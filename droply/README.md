@@ -26,3 +26,5 @@ Base multiplataforma de Flutter + Supabase para el Sprint 1 de infraestructura y
 ## Documentacion del sprint
 - Planning y checks Trello: `docs/sprint-1-planning.md`
 - Informe de cierre Sprint 2: `docs/sprint-2-closing-report.md`
+- Planning Sprint 3: `docs/sprint-3-planning.md`
+- Check-in Sprint 3: `docs/sprint-3-closing-report.md`
