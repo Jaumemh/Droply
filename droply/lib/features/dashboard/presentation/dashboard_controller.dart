@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/file_browser_repository.dart';
@@ -11,18 +13,30 @@ class DashboardController extends ChangeNotifier {
 
   bool _isLoading = true;
   bool _isBusy = false;
+  bool _isUploading = false;
+  double _uploadProgress = 0;
+  int _uploadTransferredBytes = 0;
+  int _uploadTotalBytes = 0;
+  Duration? _uploadEta;
   String? _currentFolderId;
   String? _errorMessage;
   String? _infoMessage;
+  String? _uploadMessage;
   List<FolderItem> _folderPath = const [];
   List<FolderItem> _folders = const [];
   List<FileItem> _files = const [];
 
   bool get isLoading => _isLoading;
   bool get isBusy => _isBusy;
+  bool get isUploading => _isUploading;
+  double get uploadProgress => _uploadProgress;
+  int get uploadTransferredBytes => _uploadTransferredBytes;
+  int get uploadTotalBytes => _uploadTotalBytes;
+  Duration? get uploadEta => _uploadEta;
   String? get currentFolderId => _currentFolderId;
   String? get errorMessage => _errorMessage;
   String? get infoMessage => _infoMessage;
+  String? get uploadMessage => _uploadMessage;
   List<FolderItem> get folderPath => _folderPath;
   List<FolderItem> get folders => _folders;
   List<FileItem> get files => _files;
@@ -87,24 +101,50 @@ class DashboardController extends ChangeNotifier {
     });
   }
 
-  Future<void> createFile({
+  Future<void> uploadFile({
+    required Uint8List bytes,
     required String name,
     required String mimeType,
-    required int sizeBytes,
     String? extension,
-    required String storagePath,
   }) async {
     await _runBusyAction(() async {
-      await _repository.createFile(
+      _isUploading = true;
+      _uploadProgress = 0;
+      _uploadTransferredBytes = 0;
+      _uploadTotalBytes = bytes.length;
+      _uploadEta = null;
+      _uploadMessage = 'Preparando subida...';
+      notifyListeners();
+
+      final storagePath = _buildStoragePath(name);
+      await _repository.uploadFile(
         folderId: _currentFolderId,
         name: name,
         mimeType: mimeType,
-        sizeBytes: sizeBytes,
+        sizeBytes: bytes.length,
         extension: extension,
         storagePath: storagePath,
+        bytes: bytes,
+        onProgress: (progress) {
+          _uploadProgress = progress.progress;
+          _uploadTransferredBytes = progress.bytesTransferred;
+          _uploadTotalBytes = progress.totalBytes;
+          _uploadEta = progress.remaining;
+          _uploadMessage = _formatUploadMessage(progress);
+          notifyListeners();
+        },
       );
-      _infoMessage = 'Archivo creado.';
+
+      _infoMessage = 'Archivo subido y registrado.';
       await refresh();
+    }).whenComplete(() {
+      _isUploading = false;
+      _uploadProgress = 0;
+      _uploadTransferredBytes = 0;
+      _uploadTotalBytes = 0;
+      _uploadEta = null;
+      _uploadMessage = null;
+      notifyListeners();
     });
   }
 
@@ -141,6 +181,31 @@ class DashboardController extends ChangeNotifier {
       _isBusy = false;
       notifyListeners();
     }
+  }
+
+  String _buildStoragePath(String fileName) {
+    final userId = _repository.currentUserId;
+    final folderSegment = _currentFolderId ?? 'root';
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return '$userId/$folderSegment/$timestamp-$fileName';
+  }
+
+  String _formatUploadMessage(UploadProgress progress) {
+    final percent = (progress.progress * 100).clamp(0, 100).toStringAsFixed(0);
+    final eta = progress.remaining == null
+        ? 'estimando...'
+        : '${progress.remaining!.inSeconds}s restantes';
+    return '$percent% - ${_formatTransferSize(progress.bytesTransferred)} / ${_formatTransferSize(progress.totalBytes)} - $eta';
+  }
+
+  String _formatTransferSize(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   String _readableError(Object error) {

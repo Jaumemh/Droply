@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:droply/features/dashboard/data/file_browser_repository.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:file_picker/file_picker.dart';
@@ -41,22 +39,15 @@ class _DashboardViewState extends State<DashboardView> {
             title: const Text('Droply'),
             actions: [
               TextButton.icon(
-                onPressed: controller.isBusy ? null : () => controller.createFolder('Nueva carpeta'),
+                onPressed: controller.isBusy ? null : () => _showFolderDialog(context, controller),
                 icon: const Icon(Icons.create_new_folder_outlined),
                 label: const Text('Carpeta'),
               ),
               const SizedBox(width: 8),
               TextButton.icon(
-                onPressed: controller.isBusy ? null : () => controller.createFile(
-                      name: 'Nuevo archivo',
-                      mimeType: 'application/octet-stream',
-                      sizeBytes: 0,
-                      extension: 'bin',
-                      storagePath:
-                          '${controller.currentFolderId ?? 'root'}/nuevo-archivo.bin',
-                    ),
-                icon: const Icon(Icons.add_box_outlined),
-                label: const Text('Archivo'),
+                onPressed: controller.isBusy ? null : () => _showUploadMenu(context, controller),
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: const Text('Subir'),
               ),
               const SizedBox(width: 12),
             ],
@@ -75,6 +66,14 @@ class _DashboardViewState extends State<DashboardView> {
                         theme: theme,
                       ),
                       const SizedBox(height: 20),
+                      if (controller.uploadMessage != null) ...[
+                        _Banner(
+                          color: const Color(0xFFEAF2FF),
+                          textColor: const Color(0xFF0057B2),
+                          text: controller.uploadMessage!,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (controller.errorMessage != null) ...[
                         _Banner(
                           color: const Color(0xFFFEE2E2),
@@ -91,9 +90,13 @@ class _DashboardViewState extends State<DashboardView> {
                         ),
                         const SizedBox(height: 12),
                       ],
+                      if (controller.isUploading) ...[
+                        _UploadProgressCard(controller: controller),
+                        const SizedBox(height: 16),
+                      ],
                       _Actions(
                         onCreateFolder: () => _showFolderDialog(context, controller),
-                        onCreateFile: () => _showCreateFileMenu(context, controller),
+                        onCreateFile: () => _showUploadMenu(context, controller),
                       ),
                       const SizedBox(height: 20),
                       Text(
@@ -131,9 +134,7 @@ class _DashboardViewState extends State<DashboardView> {
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
-                              headingRowColor: const MaterialStatePropertyAll(
-                                Color(0xFFEAF2FF),
-                              ),
+                              headingRowColor: const MaterialStatePropertyAll(Color(0xFFEAF2FF)),
                               columns: const [
                                 DataColumn(label: Text('Nombre')),
                                 DataColumn(label: Text('Mime')),
@@ -147,7 +148,7 @@ class _DashboardViewState extends State<DashboardView> {
                                       cells: [
                                         DataCell(Text(file.name)),
                                         DataCell(Text(file.mimeType)),
-                                        DataCell(Text('${file.sizeBytes} B')),
+                                        DataCell(Text(_formatBytes(file.sizeBytes))),
                                         DataCell(Text(file.storagePath)),
                                         DataCell(
                                           Wrap(
@@ -244,122 +245,6 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
-  Future<void> _showCreateFileMenu(BuildContext context, DashboardController controller) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Abrir galeria'),
-                subtitle: const Text('Selecciona una foto o imagen del telefono'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _pickFromGallery(controller);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.folder_open_outlined),
-                title: const Text('Abrir archivos'),
-                subtitle: const Text('Navega por el sistema de archivos del telefono'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _pickFromFiles(controller);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickFromGallery(DashboardController controller) async {
-    try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(source: ImageSource.gallery);
-      if (image == null) {
-        return;
-      }
-
-      await _createFileFromPickedPath(controller, image.path);
-    } on MissingPluginException {
-      _showPickerError('La galeria aun no esta registrada. Haz un reinicio completo de la app.');
-    } on Object catch (error) {
-      _showPickerError('No se pudo abrir la galeria: $error');
-    }
-  }
-
-  Future<void> _pickFromFiles(DashboardController controller) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(withData: false);
-      final path = result?.files.single.path;
-      if (path == null) {
-        return;
-      }
-
-      await _createFileFromPickedPath(controller, path);
-    } on Error catch (_) {
-      _showPickerError('El selector de archivos aun no esta inicializado. Haz un reinicio completo de la app.');
-    } on Object catch (error) {
-      _showPickerError('No se pudo abrir el explorador de archivos: $error');
-    }
-  }
-
-  Future<void> _createFileFromPickedPath(
-    DashboardController controller,
-    String path,
-  ) async {
-    final fileName = path.split(RegExp(r'[\\/]+')).last;
-    final extension = fileName.contains('.') ? fileName.split('.').last : null;
-    final mimeType = _guessMimeType(extension);
-    final sizeBytes = await File(path).length();
-    final storagePath = '${controller.currentFolderId ?? 'root'}/$fileName';
-
-    await controller.createFile(
-      name: fileName,
-      mimeType: mimeType,
-      sizeBytes: sizeBytes,
-      extension: extension,
-      storagePath: storagePath,
-    );
-  }
-
-  String _guessMimeType(String? extension) {
-    switch (extension?.toLowerCase()) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'pdf':
-        return 'application/pdf';
-      case 'txt':
-        return 'text/plain';
-      case 'mp4':
-        return 'video/mp4';
-      default:
-        return 'application/octet-stream';
-    }
-  }
-
-  void _showPickerError(String message) {
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
   Future<void> _showRenameFileDialog(
     BuildContext context,
     DashboardController controller,
@@ -393,6 +278,183 @@ class _DashboardViewState extends State<DashboardView> {
       ),
     );
   }
+
+  Future<void> _showUploadMenu(BuildContext context, DashboardController controller) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Abrir galeria'),
+                subtitle: const Text('Selecciona una imagen con progreso real'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _pickFromGallery(controller);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_open_outlined),
+                title: const Text('Abrir archivos'),
+                subtitle: const Text('Selecciona cualquier archivo hasta 50 MB'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _pickFromFiles(controller);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFromGallery(DashboardController controller) async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) {
+        return;
+      }
+
+      final bytes = await image.readAsBytes();
+      final fileName = image.name;
+      final extension = fileName.contains('.') ? fileName.split('.').last : 'jpg';
+      await controller.uploadFile(
+        bytes: bytes,
+        name: fileName,
+        mimeType: _guessMimeType(extension),
+        extension: extension,
+      );
+    } on MissingPluginException {
+      _showPickerError('La galeria aun no esta registrada. Haz un reinicio completo de la app.');
+    } on Object catch (error) {
+      _showPickerError('No se pudo abrir la galeria: $error');
+    }
+  }
+
+  Future<void> _pickFromFiles(DashboardController controller) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(withData: true);
+      final file = result?.files.single;
+      final bytes = file?.bytes;
+      if (file == null || bytes == null) {
+        return;
+      }
+
+      final fileName = file.name;
+      final extension = file.extension;
+      await controller.uploadFile(
+        bytes: bytes,
+        name: fileName,
+        mimeType: _guessMimeType(extension),
+        extension: extension,
+      );
+    } on Error catch (_) {
+      _showPickerError('El selector de archivos aun no esta inicializado. Haz un reinicio completo de la app.');
+    } on Object catch (error) {
+      _showPickerError('No se pudo abrir el explorador de archivos: $error');
+    }
+  }
+
+  String _guessMimeType(String? extension) {
+    switch (extension?.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'pdf':
+        return 'application/pdf';
+      case 'txt':
+        return 'text/plain';
+      case 'mp4':
+        return 'video/mp4';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    final mb = bytes / (1024 * 1024);
+    if (mb >= 1) {
+      return '${mb.toStringAsFixed(1)} MB';
+    }
+    final kb = bytes / 1024;
+    return '${kb.toStringAsFixed(1)} KB';
+  }
+
+  void _showPickerError(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+}
+
+class _UploadProgressCard extends StatelessWidget {
+  const _UploadProgressCard({required this.controller});
+
+  final DashboardController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = controller.uploadProgress;
+    final transferred = _formatTransferSize(controller.uploadTransferredBytes);
+    final total = _formatTransferSize(controller.uploadTotalBytes);
+    final eta = controller.uploadEta == null
+        ? 'Calculando...'
+        : '${controller.uploadEta!.inSeconds}s restantes';
+
+    return Card(
+      color: const Color(0xFFEAF2FF),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Subiendo archivo...',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0057B2),
+                  ),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(value: progress, minHeight: 10),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${(progress * 100).toStringAsFixed(0)}% - $transferred / $total - $eta',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTransferSize(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -412,91 +474,64 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final breadcrumbs = <_Breadcrumb>[
-      const _Breadcrumb(label: 'Raiz', folderId: null),
-      ...controller.folderPath
-          .map((folder) => _Breadcrumb(label: folder.name, folderId: folder.id)),
-    ];
+    final path = controller.folderPath;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Tauler',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final crumb in breadcrumbs)
-                  ActionChip(
-                    label: Text(crumb.label),
-                    onPressed: () => crumb.folderId == null ? onGoRoot() : controller.openFolder(crumb.folderId),
-                    backgroundColor: crumb.folderId == null ? const Color(0xFFEAF2FF) : null,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              controller.currentFolderId == null
-                  ? 'Estas en la raiz. Entra en una carpeta para navegar la jerarquia.'
-                  : 'Navegacion por parent_id activa. Cada carpeta se carga segun su nivel actual.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF475569),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              alignment: WrapAlignment.start,
-              children: [
-                FilledButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Actualizar'),
-                ),
-                Text(
-                  controller.isBusy ? 'Procesando cambios...' : 'Estado listo',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-                Text(
-                  userEmail,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF0066CC),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0066CC), Color(0xFF0057B2)],
         ),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tauler',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Base tecnica lista para Android, Web y Desktop con carga real a Storage.',
+            style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            userEmail,
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ActionChip(
+                label: const Text('Raiz'),
+                onPressed: onGoRoot,
+                backgroundColor: Colors.white,
+              ),
+              for (final folder in path)
+                ActionChip(
+                  label: Text(folder.name),
+                  onPressed: () => controller.openFolder(folder.id),
+                  backgroundColor: Colors.white,
+                ),
+              if (onRefresh != null)
+                ActionChip(
+                  label: const Text('Refrescar'),
+                  onPressed: onRefresh,
+                  backgroundColor: Colors.white,
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
-}
-
-class _Breadcrumb {
-  const _Breadcrumb({
-    required this.label,
-    required this.folderId,
-  });
-
-  final String label;
-  final String? folderId;
 }
 
 class _Actions extends StatelessWidget {
@@ -521,8 +556,8 @@ class _Actions extends StatelessWidget {
         ),
         FilledButton.icon(
           onPressed: onCreateFile,
-          icon: const Icon(Icons.note_add_outlined),
-          label: const Text('Crear archivo'),
+          icon: const Icon(Icons.upload_file_outlined),
+          label: const Text('Subir archivo'),
         ),
       ],
     );
