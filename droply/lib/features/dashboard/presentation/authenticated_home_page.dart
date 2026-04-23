@@ -45,6 +45,7 @@ class _AuthenticatedHomePageState extends State<AuthenticatedHomePage> {
   Widget build(BuildContext context) {
     return DashboardView(
       controller: _dashboardController,
+      authController: widget.controller,
       userEmail: widget.controller.currentUser?.email ?? widget.controller.email,
     );
   }

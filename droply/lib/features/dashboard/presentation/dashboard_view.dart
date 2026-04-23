@@ -1,4 +1,5 @@
 import 'package:droply/features/dashboard/data/file_browser_repository.dart';
+import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -9,10 +10,12 @@ class DashboardView extends StatefulWidget {
   const DashboardView({
     super.key,
     required this.controller,
+    required this.authController,
     required this.userEmail,
   });
 
   final DashboardController controller;
+  final AuthController authController;
   final String userEmail;
 
   @override
@@ -48,6 +51,14 @@ class _DashboardViewState extends State<DashboardView> {
                 onPressed: controller.isBusy ? null : () => _showUploadMenu(context, controller),
                 icon: const Icon(Icons.cloud_upload_outlined),
                 label: const Text('Subir'),
+              ),
+              const SizedBox(width: 12),
+              TextButton.icon(
+                onPressed: widget.authController.isBusy
+                    ? null
+                    : () => widget.authController.signOut(),
+                icon: const Icon(Icons.logout_outlined),
+                label: const Text('Salir'),
               ),
               const SizedBox(width: 12),
             ],
@@ -369,14 +380,59 @@ class _DashboardViewState extends State<DashboardView> {
         return 'image/jpeg';
       case 'png':
         return 'image/png';
+      case 'webp':
+        return 'image/webp';
       case 'gif':
         return 'image/gif';
+      case 'svg':
+        return 'image/svg+xml';
       case 'pdf':
         return 'application/pdf';
       case 'txt':
         return 'text/plain';
+      case 'md':
+        return 'text/markdown';
+      case 'csv':
+        return 'text/csv';
+      case 'json':
+        return 'application/json';
+      case 'xml':
+        return 'application/xml';
+      case 'html':
+      case 'htm':
+        return 'text/html';
+      case 'css':
+        return 'text/css';
+      case 'js':
+        return 'application/javascript';
+      case 'zip':
+        return 'application/zip';
+      case 'rar':
+        return 'application/x-rar-compressed';
+      case '7z':
+        return 'application/x-7z-compressed';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'm4a':
+        return 'audio/mp4';
       case 'mp4':
         return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
       default:
         return 'application/octet-stream';
     }
