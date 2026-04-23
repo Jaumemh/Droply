@@ -3,13 +3,17 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 import '../data/file_browser_repository.dart';
+import '../../sharing/data/share_repository.dart';
 
 class DashboardController extends ChangeNotifier {
   DashboardController({
     required FileBrowserRepositoryBase repository,
-  }) : _repository = repository;
+    ShareRepository? shareRepository,
+  })  : _repository = repository,
+        _shareRepository = shareRepository;
 
   final FileBrowserRepositoryBase _repository;
+  final ShareRepository? _shareRepository;
 
   bool _isLoading = true;
   bool _isBusy = false;
@@ -25,6 +29,7 @@ class DashboardController extends ChangeNotifier {
   List<FolderItem> _folderPath = const [];
   List<FolderItem> _folders = const [];
   List<FileItem> _files = const [];
+  List<FileItem> _sharedFiles = const [];
 
   bool get isLoading => _isLoading;
   bool get isBusy => _isBusy;
@@ -40,6 +45,7 @@ class DashboardController extends ChangeNotifier {
   List<FolderItem> get folderPath => _folderPath;
   List<FolderItem> get folders => _folders;
   List<FileItem> get files => _files;
+  List<FileItem> get sharedFiles => _sharedFiles;
 
   Future<void> initialize() async {
     await refresh();
@@ -55,6 +61,7 @@ class DashboardController extends ChangeNotifier {
       _folderPath = snapshot.folderPath;
       _folders = snapshot.folders;
       _files = snapshot.files;
+      _sharedFiles = snapshot.sharedFiles;
     } catch (error) {
       _errorMessage = _readableError(error);
     } finally {
@@ -167,6 +174,14 @@ class DashboardController extends ChangeNotifier {
     });
   }
 
+  Future<ShareLinkResult> createShare({
+    required String fileId,
+    String? note,
+  }) async {
+    final repository = _shareRepository ?? ShareRepository(_repositoryClient);
+    return repository.createShare(fileId: fileId, note: note);
+  }
+
   Future<void> _runBusyAction(Future<void> Function() action) async {
     _isBusy = true;
     _errorMessage = null;
@@ -185,9 +200,14 @@ class DashboardController extends ChangeNotifier {
 
   String _buildStoragePath(String fileName) {
     final userId = _repository.currentUserId;
-    final folderSegment = _currentFolderId ?? 'root';
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return '$userId/$folderSegment/$timestamp-$fileName';
+    final folderSegments = _folderPath
+        .map((folder) => _sanitizePathSegment(folder.name))
+        .toList();
+    final safeFileName = _sanitizePathSegment(fileName);
+    if (folderSegments.isEmpty) {
+      return '$userId/root/$safeFileName';
+    }
+    return '$userId/${folderSegments.join('/')}/$safeFileName';
   }
 
   String _formatUploadMessage(UploadProgress progress) {
@@ -206,6 +226,19 @@ class DashboardController extends ChangeNotifier {
       return '${(bytes / 1024).toStringAsFixed(1)} KB';
     }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _sanitizePathSegment(String value) {
+    final trimmed = value.trim();
+    final sanitized = trimmed.replaceAll(RegExp(r'[\\/]+'), '-');
+    return sanitized.isEmpty ? 'unnamed' : sanitized;
+  }
+
+  dynamic get _repositoryClient {
+    if (_repository is FileBrowserRepository) {
+      return (_repository as FileBrowserRepository).client;
+    }
+    throw StateError('Share creation requires a Supabase-backed repository.');
   }
 
   String _readableError(Object error) {

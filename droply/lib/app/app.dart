@@ -4,6 +4,7 @@ import 'package:droply/features/auth/presentation/auth_gate.dart';
 import 'package:droply/features/auth/supabase_auth_repository.dart';
 import 'package:droply/features/auth/unsupported_auth_repository.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:droply/features/sharing/presentation/share_viewer_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -79,10 +80,20 @@ class _DroplyAppState extends State<DroplyApp> {
           ),
         ),
       ),
-      home: AuthGate(
-        controller: _controller,
-        dashboardController: _dashboardController,
-      ),
+      home: _buildEntryPage(),
+    );
+  }
+
+  Widget _buildEntryPage() {
+    final uri = Uri.base;
+    if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'share') {
+      final token = uri.pathSegments.length > 1 ? uri.pathSegments[1] : '';
+      return ShareViewerPage(token: token);
+    }
+
+    return AuthGate(
+      controller: _controller,
+      dashboardController: _dashboardController,
     );
   }
 

@@ -80,12 +80,14 @@ class FileBrowserSnapshot {
     required this.folderPath,
     required this.folders,
     required this.files,
+    required this.sharedFiles,
   });
 
   final String? currentFolderId;
   final List<FolderItem> folderPath;
   final List<FolderItem> folders;
   final List<FileItem> files;
+  final List<FileItem> sharedFiles;
 }
 
 class UploadProgress {
@@ -123,12 +125,15 @@ abstract class FileBrowserRepositoryBase {
   Future<void> renameFile({required String fileId, required String newName});
   Future<void> deleteFile({required String fileId});
   Future<List<FolderItem>> loadFolderPath(String? folderId);
+  Future<List<FileItem>> loadSharedFiles();
 }
 
 class FileBrowserRepository extends FileBrowserRepositoryBase {
   FileBrowserRepository(this._client);
 
   final SupabaseClient _client;
+
+  SupabaseClient get client => _client;
 
   String get currentUserId {
     final user = _client.auth.currentUser;
@@ -161,12 +166,14 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     final files = _mapFiles(filesQuery)
         .where((file) => file.folderId == folderId)
         .toList();
+    final sharedFiles = await loadSharedFiles();
 
     return FileBrowserSnapshot(
       currentFolderId: folderId,
       folderPath: _buildPath(folderId, folders),
       folders: folders.where((folder) => folder.parentId == folderId).toList(),
       files: files,
+      sharedFiles: sharedFiles,
     );
   }
 
@@ -342,6 +349,12 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
 
     final folders = _mapFolders(foldersQuery);
     return _buildPath(folderId, folders);
+  }
+
+  @override
+  Future<List<FileItem>> loadSharedFiles() async {
+    final response = await _client.rpc('get_shared_files');
+    return _mapFiles(response);
   }
 
   List<FolderItem> _mapFolders(dynamic foldersQuery) {

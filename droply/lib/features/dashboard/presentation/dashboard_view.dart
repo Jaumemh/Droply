@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({
@@ -174,12 +175,51 @@ class _DashboardViewState extends State<DashboardView> {
                                                 child: const Text('Renombrar'),
                                               ),
                                               TextButton(
+                                                onPressed: () => _shareFile(context, controller, file),
+                                                child: const Text('Compartir'),
+                                              ),
+                                              TextButton(
                                                 onPressed: () => controller.deleteFile(file.id),
                                                 child: const Text('Eliminar'),
                                               ),
                                             ],
                                           ),
                                         ),
+                                      ],
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Compartidos conmigo',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 12),
+                      if (controller.sharedFiles.isEmpty)
+                        const _EmptyState(label: 'Aun no tienes archivos compartidos aceptados.')
+                      else
+                        Card(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              headingRowColor: const MaterialStatePropertyAll(Color(0xFFEAF2FF)),
+                              columns: const [
+                                DataColumn(label: Text('Nombre')),
+                                DataColumn(label: Text('Mime')),
+                                DataColumn(label: Text('Tamano')),
+                                DataColumn(label: Text('Ruta')),
+                              ],
+                              rows: controller.sharedFiles
+                                  .map(
+                                    (file) => DataRow(
+                                      cells: [
+                                        DataCell(Text(file.name)),
+                                        DataCell(Text(file.mimeType)),
+                                        DataCell(Text(_formatBytes(file.sizeBytes))),
+                                        DataCell(Text(file.storagePath)),
                                       ],
                                     ),
                                   )
@@ -288,6 +328,91 @@ class _DashboardViewState extends State<DashboardView> {
         ],
       ),
     );
+  }
+
+  Future<void> _shareFile(
+    BuildContext context,
+    DashboardController controller,
+    FileItem file,
+  ) async {
+    final noteController = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Compartir archivo'),
+        content: TextField(
+          controller: noteController,
+          decoration: const InputDecoration(
+            labelText: 'Nota opcional',
+            helperText: 'Caduca por defecto en 7 dias.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+      await _createShareLink(context, controller, file, noteController.text);
+            },
+            child: const Text('Crear enlace'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createShareLink(
+    BuildContext context,
+    DashboardController controller,
+    FileItem file,
+    String? note,
+  ) async {
+    try {
+      final result = await controller.createShare(fileId: file.id, note: note);
+      final link = Uri.base.resolve('/share/${result.token}').toString();
+      if (!context.mounted) {
+        return;
+      }
+
+      await Clipboard.setData(ClipboardData(text: link));
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Enlace copiado. Caduca el ${result.expiresAt}.')),
+      );
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Enlace listo'),
+          content: SelectableText(link),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+              },
+              child: const Text('Abrir'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        ),
+      );
+    } on Object catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo crear el enlace: $error')),
+      );
+    }
   }
 
   Future<void> _showUploadMenu(BuildContext context, DashboardController controller) async {
