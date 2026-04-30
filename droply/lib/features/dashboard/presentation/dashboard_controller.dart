@@ -29,6 +29,7 @@ class DashboardController extends ChangeNotifier {
   String _searchQuery = '';
   FileTypeFilter _fileTypeFilter = FileTypeFilter.all;
   List<FolderItem> _folderPath = const [];
+  List<FolderItem> _allFolders = const [];
   List<FolderItem> _folders = const [];
   List<FileItem> _files = const [];
   List<FileItem> _sharedFiles = const [];
@@ -47,6 +48,7 @@ class DashboardController extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   FileTypeFilter get fileTypeFilter => _fileTypeFilter;
   List<FolderItem> get folderPath => _folderPath;
+  List<FolderItem> get allFolders => _allFolders;
   List<FolderItem> get folders => _folders;
   List<FileItem> get files => _filterFiles(_files);
   List<FileItem> get sharedFiles => _filterFiles(_sharedFiles);
@@ -63,6 +65,7 @@ class DashboardController extends ChangeNotifier {
     try {
       final snapshot = await _repository.load(folderId: _currentFolderId);
       _folderPath = snapshot.folderPath;
+      _allFolders = snapshot.allFolders;
       _folders = snapshot.folders;
       _files = snapshot.files;
       _sharedFiles = snapshot.sharedFiles;
@@ -181,6 +184,20 @@ class DashboardController extends ChangeNotifier {
     await _runBusyAction(() async {
       await _repository.renameFile(fileId: fileId, newName: newName);
       _infoMessage = 'Archivo renombrado.';
+      await refresh();
+    });
+  }
+
+  Future<void> moveFile({
+    required String fileId,
+    String? folderId,
+  }) async {
+    await _runBusyAction(() async {
+      await _repository.moveFile(
+        fileId: fileId,
+        folderId: folderId,
+      );
+      _infoMessage = 'Archivo movido.';
       await refresh();
     });
   }

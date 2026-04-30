@@ -81,6 +81,7 @@ class FileBrowserSnapshot {
   FileBrowserSnapshot({
     required this.currentFolderId,
     required this.folderPath,
+    required this.allFolders,
     required this.folders,
     required this.files,
     required this.sharedFiles,
@@ -88,6 +89,7 @@ class FileBrowserSnapshot {
 
   final String? currentFolderId;
   final List<FolderItem> folderPath;
+  final List<FolderItem> allFolders;
   final List<FolderItem> folders;
   final List<FileItem> files;
   final List<FileItem> sharedFiles;
@@ -115,6 +117,7 @@ abstract class FileBrowserRepositoryBase {
   Future<void> createFolder({required String name, String? parentId});
   Future<void> renameFolder({required String folderId, required String newName});
   Future<void> deleteFolder({required String folderId});
+  Future<void> moveFile({required String fileId, String? folderId});
   Future<FileItem> uploadFile({
     String? folderId,
     required String name,
@@ -175,6 +178,7 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     return FileBrowserSnapshot(
       currentFolderId: folderId,
       folderPath: _buildPath(folderId, folders),
+      allFolders: folders,
       folders: folders.where((folder) => folder.parentId == folderId).toList(),
       files: files,
       sharedFiles: sharedFiles,
@@ -332,12 +336,43 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
   }
 
   @override
-  Future<void> deleteFile({
+  Future<void> moveFile({
     required String fileId,
+    String? folderId,
   }) async {
     await _client
         .from('files')
+        .update({'folder_id': folderId}).eq('id', fileId).eq('owner_id', currentUserId);
+  }
+
+  @override
+  Future<void> deleteFile({
+    required String fileId,
+  }) async {
+    final file = await _client
+        .from('files')
+        .select('id, storage_path')
+        .eq('id', fileId)
+        .eq('owner_id', currentUserId)
+        .single();
+    final map = Map<String, dynamic>.from(file as Map);
+    final storagePath = map['storage_path'] as String;
+
+    await _client.storage.from('droply-files').remove([storagePath]);
+
+    await _client
+        .from('files')
         .update({'is_deleted': true}).eq('id', fileId).eq('owner_id', currentUserId);
+
+    await _client.from('events').insert({
+      'user_id': currentUserId,
+      'file_id': fileId,
+      'action': 'DELETE',
+      'target_type': 'file',
+      'metadata': {
+        'storage_path': storagePath,
+      },
+    });
   }
 
   @override

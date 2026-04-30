@@ -177,6 +177,15 @@ class _DashboardViewState extends State<DashboardView> {
                                             ),
                                           ),
                                           _FileAction(
+                                            label: 'Mover',
+                                            icon: Icons.drive_file_move_outlined,
+                                            onPressed: () => _showMoveFileDialog(
+                                              context,
+                                              controller,
+                                              file,
+                                            ),
+                                          ),
+                                          _FileAction(
                                             label: 'Compartir',
                                             icon: Icons.share_outlined,
                                             onPressed: () => _shareFile(context, controller, file),
@@ -551,6 +560,64 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showMoveFileDialog(
+    BuildContext context,
+    DashboardController controller,
+    FileItem file,
+  ) async {
+    final folders = controller.allFolders;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        String? selectedFolderId = file.folderId;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Mover archivo'),
+              content: DropdownButtonFormField<String?>(
+                value: folders.any((folder) => folder.id == selectedFolderId) ? selectedFolderId : null,
+                decoration: const InputDecoration(labelText: 'Carpeta destino'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Raiz'),
+                  ),
+                  ...folders.map(
+                    (folder) => DropdownMenuItem<String?>(
+                      value: folder.id,
+                      child: Text(folder.name),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    selectedFolderId = value;
+                  });
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await controller.moveFile(
+                      fileId: file.id,
+                      folderId: selectedFolderId,
+                    );
+                  },
+                  child: const Text('Mover'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
