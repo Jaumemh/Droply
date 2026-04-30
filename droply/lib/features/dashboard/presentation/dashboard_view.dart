@@ -117,6 +117,7 @@ class _DashboardViewState extends State<DashboardView> {
                       const SizedBox(height: 20),
                       Text(
                         'Carpetas',
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
@@ -124,6 +125,7 @@ class _DashboardViewState extends State<DashboardView> {
                         const _EmptyState(label: 'No hay carpetas en este nivel.')
                       else
                         Wrap(
+                          alignment: WrapAlignment.center,
                           spacing: 16,
                           runSpacing: 16,
                           children: controller.folders
@@ -140,6 +142,7 @@ class _DashboardViewState extends State<DashboardView> {
                       const SizedBox(height: 24),
                       Text(
                         'Archivos',
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
@@ -154,6 +157,7 @@ class _DashboardViewState extends State<DashboardView> {
                                     ? 2
                                     : 1;
                             return Wrap(
+                              alignment: WrapAlignment.center,
                               spacing: 16,
                               runSpacing: 16,
                               children: controller.files
@@ -206,6 +210,7 @@ class _DashboardViewState extends State<DashboardView> {
                       const SizedBox(height: 24),
                       Text(
                         'Compartidos conmigo',
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
@@ -220,6 +225,7 @@ class _DashboardViewState extends State<DashboardView> {
                                     ? 2
                                     : 1;
                             return Wrap(
+                              alignment: WrapAlignment.center,
                               spacing: 16,
                               runSpacing: 16,
                               children: controller.sharedFiles
@@ -978,6 +984,7 @@ class _Header extends StatelessWidget {
     final path = controller.folderPath;
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -986,7 +993,7 @@ class _Header extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             'Tauler',
@@ -994,19 +1001,23 @@ class _Header extends StatelessWidget {
               color: Colors.white,
               fontWeight: FontWeight.w800,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'Base tecnica lista para Android, Web y Desktop con carga real a Storage.',
             style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Text(
             userEmail,
             style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Wrap(
+            alignment: WrapAlignment.center,
             spacing: 8,
             runSpacing: 8,
             children: [
@@ -1047,6 +1058,7 @@ class _Actions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
+      alignment: WrapAlignment.center,
       spacing: 12,
       runSpacing: 12,
       children: [
@@ -1140,40 +1152,106 @@ class _FolderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isRootFolder = folder.parentId == null;
+
     return SizedBox(
-      width: 240,
+      width: 260,
       child: Card(
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFD7E2F2)),
+        ),
         child: InkWell(
           onTap: onOpen,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.folder_rounded, color: Color(0xFF0066CC), size: 36),
-                const SizedBox(height: 12),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF2FF),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.folder_rounded,
+                    color: Color(0xFF0066CC),
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Text(
                   folder.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF172033),
+                        fontWeight: FontWeight.w800,
                       ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  folder.parentId == null ? 'Carpeta raiz' : 'Subcarpeta',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF64748B),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F8FB),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFE3EAF5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isRootFolder
+                            ? Icons.account_tree_outlined
+                            : Icons.subdirectory_arrow_right_outlined,
+                        color: const Color(0xFF5C6F8C),
+                        size: 16,
                       ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isRootFolder ? 'Carpeta raiz' : 'Subcarpeta',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF5C6F8C),
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    TextButton(onPressed: onOpen, child: const Text('Abrir')),
-                    TextButton(onPressed: onRename, child: const Text('Renombrar')),
-                    TextButton(onPressed: onDelete, child: const Text('Eliminar')),
+                    IconButton.filledTonal(
+                      tooltip: 'Abrir',
+                      onPressed: onOpen,
+                      icon: const Icon(Icons.folder_open_outlined),
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton.filledTonal(
+                      tooltip: 'Renombrar',
+                      onPressed: onRename,
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      tooltip: 'Eliminar',
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline),
+                      style: IconButton.styleFrom(
+                        foregroundColor: const Color(0xFFB42318),
+                        backgroundColor: const Color(0xFFFFEDEA),
+                        hoverColor: const Color(0xFFFFD7D1),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -1200,7 +1278,10 @@ class _EmptyState extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFDCE4F0)),
       ),
-      child: Text(label),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }
@@ -1227,6 +1308,7 @@ class _Banner extends StatelessWidget {
       ),
       child: Text(
         text,
+        textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: textColor,
               fontWeight: FontWeight.w600,
@@ -1264,73 +1346,116 @@ class _FileCard extends StatelessWidget {
   final Color accent;
   final VoidCallback onTap;
   final List<_FileAction> actions;
+  static const _cardHeight = 272.0;
+  static const _titleHeight = 48.0;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: const BorderSide(color: Color(0xFFDDE6F3)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      height: _cardHeight,
+      child: Card(
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFD7E2F2)),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: accent.withValues(alpha: 0.18)),
+                  ),
+                  child: Icon(icon, color: accent, size: 30),
                 ),
-                child: Icon(icon, color: accent, size: 28),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: _titleHeight,
+                  child: Center(
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFF172033),
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF64748B),
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 6,
-                runSpacing: 6,
-                children: actions
-                    .map(
-                      (action) => FilledButton.tonalIcon(
-                        onPressed: action.onPressed,
-                        icon: Icon(action.icon, size: 18),
-                        label: Text(action.label),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          visualDensity: VisualDensity.compact,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F8FB),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFE3EAF5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.sd_storage_outlined,
+                        color: Color(0xFF5C6F8C),
+                        size: 16,
                       ),
-                    )
-                    .toList(),
-              ),
-            ],
+                      const SizedBox(width: 6),
+                      Text(
+                        subtitle,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF5C6F8C),
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: actions.map(_buildActionButton).toList(),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(_FileAction action) {
+    final isDangerAction =
+        action.icon == Icons.delete_outline || action.icon == Icons.remove_circle_outline;
+
+    return IconButton(
+      tooltip: action.label,
+      onPressed: action.onPressed,
+      icon: Icon(action.icon, size: 20),
+      style: IconButton.styleFrom(
+        fixedSize: const Size.square(42),
+        foregroundColor: isDangerAction ? const Color(0xFFB42318) : accent,
+        backgroundColor:
+            isDangerAction ? const Color(0xFFFFEDEA) : accent.withValues(alpha: 0.10),
+        disabledForegroundColor: const Color(0xFF94A3B8),
+        disabledBackgroundColor: const Color(0xFFF1F5F9),
+        hoverColor:
+            isDangerAction ? const Color(0xFFFFD7D1) : accent.withValues(alpha: 0.16),
       ),
     );
   }

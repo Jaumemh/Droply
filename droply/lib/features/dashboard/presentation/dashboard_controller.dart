@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,7 @@ class DashboardController extends ChangeNotifier {
 
   final FileBrowserRepositoryBase _repository;
   final ShareRepository? _shareRepository;
+  static const _infoMessageDuration = Duration(seconds: 5);
 
   bool _isLoading = true;
   bool _isBusy = false;
@@ -26,6 +28,7 @@ class DashboardController extends ChangeNotifier {
   String? _errorMessage;
   String? _infoMessage;
   String? _uploadMessage;
+  Timer? _infoMessageTimer;
   String _searchQuery = '';
   FileTypeFilter _fileTypeFilter = FileTypeFilter.all;
   List<FolderItem> _folderPath = const [];
@@ -164,7 +167,7 @@ class DashboardController extends ChangeNotifier {
         },
       );
 
-      _infoMessage = 'Archivo subido y registrado.';
+      _showTimedInfoMessage('Archivo subido y registrado.');
       await refresh();
     }).whenComplete(() {
       _isUploading = false;
@@ -244,6 +247,7 @@ class DashboardController extends ChangeNotifier {
   Future<void> _runBusyAction(Future<void> Function() action) async {
     _isBusy = true;
     _errorMessage = null;
+    _infoMessageTimer?.cancel();
     _infoMessage = null;
     notifyListeners();
 
@@ -285,6 +289,25 @@ class DashboardController extends ChangeNotifier {
       return '${(bytes / 1024).toStringAsFixed(1)} KB';
     }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  void _showTimedInfoMessage(String message) {
+    _infoMessageTimer?.cancel();
+    _infoMessage = message;
+    _infoMessageTimer = Timer(_infoMessageDuration, () {
+      if (_infoMessage != message) {
+        return;
+      }
+
+      _infoMessage = null;
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _infoMessageTimer?.cancel();
+    super.dispose();
   }
 
   String _sanitizePathSegment(String value) {
