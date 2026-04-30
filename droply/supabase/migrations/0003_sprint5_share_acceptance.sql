@@ -114,7 +114,7 @@ begin
     v_share.id,
     'SHARE_ACCEPT'::public.event_action,
     'share',
-    p_ip_client,
+    coalesce(p_ip_client, inet_client_addr()),
     p_user_agent,
     jsonb_build_object('token', p_token)
   );
