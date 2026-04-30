@@ -26,6 +26,8 @@ class DashboardController extends ChangeNotifier {
   String? _errorMessage;
   String? _infoMessage;
   String? _uploadMessage;
+  String _searchQuery = '';
+  FileTypeFilter _fileTypeFilter = FileTypeFilter.all;
   List<FolderItem> _folderPath = const [];
   List<FolderItem> _folders = const [];
   List<FileItem> _files = const [];
@@ -42,10 +44,12 @@ class DashboardController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get infoMessage => _infoMessage;
   String? get uploadMessage => _uploadMessage;
+  String get searchQuery => _searchQuery;
+  FileTypeFilter get fileTypeFilter => _fileTypeFilter;
   List<FolderItem> get folderPath => _folderPath;
   List<FolderItem> get folders => _folders;
-  List<FileItem> get files => _files;
-  List<FileItem> get sharedFiles => _sharedFiles;
+  List<FileItem> get files => _filterFiles(_files);
+  List<FileItem> get sharedFiles => _filterFiles(_sharedFiles);
 
   Future<void> initialize() async {
     await refresh();
@@ -68,6 +72,21 @@ class DashboardController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void setSearchQuery(String value) {
+    _searchQuery = value;
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _searchQuery = '';
+    notifyListeners();
+  }
+
+  void setFileTypeFilter(FileTypeFilter filter) {
+    _fileTypeFilter = filter;
+    notifyListeners();
   }
 
   Future<void> openFolder(String? folderId) async {
@@ -259,4 +278,35 @@ class DashboardController extends ChangeNotifier {
     }
     return message.replaceFirst('Exception: ', '');
   }
+
+  List<FileItem> _filterFiles(List<FileItem> items) {
+    return items.where((file) {
+      final matchesSearch = _searchQuery.trim().isEmpty ||
+          file.name.toLowerCase().contains(_searchQuery.trim().toLowerCase());
+      final matchesType = switch (_fileTypeFilter) {
+        FileTypeFilter.all => true,
+        FileTypeFilter.pdf => _isPdf(file),
+        FileTypeFilter.images => _isImage(file),
+        FileTypeFilter.other => !_isPdf(file) && !_isImage(file),
+      };
+      return matchesSearch && matchesType;
+    }).toList();
+  }
+
+  bool _isPdf(FileItem file) {
+    return file.mimeType.toLowerCase() == 'application/pdf' ||
+        file.name.toLowerCase().endsWith('.pdf');
+  }
+
+  bool _isImage(FileItem file) {
+    final mime = file.mimeType.toLowerCase();
+    return mime.startsWith('image/') ||
+        file.name.toLowerCase().endsWith('.jpg') ||
+        file.name.toLowerCase().endsWith('.jpeg') ||
+        file.name.toLowerCase().endsWith('.png') ||
+        file.name.toLowerCase().endsWith('.gif') ||
+        file.name.toLowerCase().endsWith('.webp');
+  }
 }
+
+enum FileTypeFilter { all, pdf, images, other }

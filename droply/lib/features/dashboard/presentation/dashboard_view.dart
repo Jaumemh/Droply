@@ -112,6 +112,8 @@ class _DashboardViewState extends State<DashboardView> {
                         onCreateFile: () => _showUploadMenu(context, controller),
                       ),
                       const SizedBox(height: 20),
+                      _SearchAndFilterBar(controller: controller),
+                      const SizedBox(height: 20),
                       Text(
                         'Carpetas',
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -777,6 +779,66 @@ class _Actions extends StatelessWidget {
           label: const Text('Subir archivo'),
         ),
       ],
+    );
+  }
+}
+
+class _SearchAndFilterBar extends StatelessWidget {
+  const _SearchAndFilterBar({required this.controller});
+
+  final DashboardController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: TextEditingController(text: controller.searchQuery),
+              onChanged: controller.setSearchQuery,
+              decoration: InputDecoration(
+                labelText: 'Buscar por nombre',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: controller.searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: controller.clearSearch,
+                        icon: const Icon(Icons.clear),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Todos'),
+                  selected: controller.fileTypeFilter == FileTypeFilter.all,
+                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.all),
+                ),
+                ChoiceChip(
+                  label: const Text('PDF'),
+                  selected: controller.fileTypeFilter == FileTypeFilter.pdf,
+                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.pdf),
+                ),
+                ChoiceChip(
+                  label: const Text('Imágenes'),
+                  selected: controller.fileTypeFilter == FileTypeFilter.images,
+                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.images),
+                ),
+                ChoiceChip(
+                  label: const Text('Otros'),
+                  selected: controller.fileTypeFilter == FileTypeFilter.other,
+                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.other),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
