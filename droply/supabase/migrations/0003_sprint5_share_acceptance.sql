@@ -135,6 +135,7 @@ $$;
 create or replace function public.get_shared_files()
 returns table (
   id uuid,
+  share_id uuid,
   owner_id uuid,
   folder_id uuid,
   name text,
@@ -152,6 +153,7 @@ set search_path = public
 as $$
   select distinct on (f.id)
     f.id,
+    s.id as share_id,
     f.owner_id,
     f.folder_id,
     f.name,

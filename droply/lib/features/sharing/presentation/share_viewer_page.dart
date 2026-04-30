@@ -1,4 +1,10 @@
 import 'package:droply/features/sharing/data/share_repository.dart';
+import 'package:droply/features/auth/auth_controller.dart';
+import 'package:droply/features/auth/auth_status.dart';
+import 'package:droply/features/auth/presentation/otp_login_page.dart';
+import 'package:droply/features/auth/supabase_auth_repository.dart';
+import 'package:droply/features/auth/unsupported_auth_repository.dart';
+import 'package:droply/core/config/env.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,6 +24,8 @@ class ShareViewerPage extends StatefulWidget {
 
 class _ShareViewerPageState extends State<ShareViewerPage> {
   late final ShareRepository _repository;
+  late final AuthController _authController;
+  late final bool _ownsAuthController;
   Future<ShareAccessResult>? _future;
   String? _fatalMessage;
 
@@ -25,7 +33,32 @@ class _ShareViewerPageState extends State<ShareViewerPage> {
   void initState() {
     super.initState();
     _repository = ShareRepository(Supabase.instance.client);
+    _ownsAuthController = true;
+    _authController = _createAuthController();
+    _authController.initialize();
     _future = _resolve('PREVIEW');
+  }
+
+  AuthController _createAuthController() {
+    final existing = Supabase.instance.client.auth.currentSession;
+    if (existing != null) {
+      return AuthController(
+        repository: SupabaseAuthRepository(Supabase.instance.client),
+      );
+    }
+
+    if (!EnvConfig.isSupabaseConfigured) {
+      return AuthController(
+        repository: UnsupportedAuthRepository(
+          message:
+              'Configura SUPABASE_URL y SUPABASE_ANON_KEY para iniciar sesión y descargar.',
+        ),
+      );
+    }
+
+    return AuthController(
+      repository: SupabaseAuthRepository(Supabase.instance.client),
+    );
   }
 
   Future<ShareAccessResult> _resolve(String action) async {
@@ -54,6 +87,14 @@ class _ShareViewerPageState extends State<ShareViewerPage> {
   }
 
   @override
+  void dispose() {
+    if (_ownsAuthController) {
+      _authController.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
@@ -61,48 +102,61 @@ class _ShareViewerPageState extends State<ShareViewerPage> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: FutureBuilder<ShareAccessResult>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (_fatalMessage != null) {
-                  return _FatalState(message: _fatalMessage!);
-                }
+            child: AnimatedBuilder(
+              animation: _authController,
+              builder: (context, _) {
+                switch (_authController.status) {
+                  case AuthStatus.unknown:
+                    return const CircularProgressIndicator();
+                  case AuthStatus.unauthenticated:
+                  case AuthStatus.otpSent:
+                    return OtpLoginPage(controller: _authController);
+                  case AuthStatus.authenticated:
+                    return FutureBuilder<ShareAccessResult>(
+                      future: _future,
+                      builder: (context, snapshot) {
+                        if (_fatalMessage != null) {
+                          return _FatalState(message: _fatalMessage!);
+                        }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                }
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const CircularProgressIndicator();
+                        }
 
-                if (snapshot.hasError) {
-                  return _ErrorState(
-                    message: snapshot.error.toString().replaceFirst('Exception: ', ''),
-                  );
-                }
+                        if (snapshot.hasError) {
+                          return _ErrorState(
+                            message: snapshot.error.toString().replaceFirst('Exception: ', ''),
+                          );
+                        }
 
-                final access = snapshot.data!;
-                return _ViewerCard(
-                  access: access,
-                  onDownload: () async {
-                    final downloadAccess = await _resolve('DOWNLOAD');
-                    if (!mounted) {
-                      return;
-                    }
-                    if (downloadAccess.signedUrl == null || downloadAccess.signedUrl!.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No se pudo firmar la URL. Revisa que el archivo exista en Storage con la ruta guardada.'),
-                        ),
-                      );
-                      return;
-                    }
-                    await launchUrl(
-                      Uri.parse(downloadAccess.signedUrl!),
-                      mode: LaunchMode.externalApplication,
+                        final access = snapshot.data!;
+                        return _ViewerCard(
+                          access: access,
+                          onDownload: () async {
+                            final downloadAccess = await _resolve('DOWNLOAD');
+                            if (!mounted) {
+                              return;
+                            }
+                            if (downloadAccess.signedUrl == null || downloadAccess.signedUrl!.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No se pudo firmar la URL. Revisa que el archivo exista en Storage con la ruta guardada.'),
+                                ),
+                              );
+                              return;
+                            }
+                            await launchUrl(
+                              Uri.parse(downloadAccess.signedUrl!),
+                              mode: LaunchMode.externalApplication,
+                            );
+                            setState(() {
+                              _future = Future.value(downloadAccess);
+                            });
+                          },
+                        );
+                      },
                     );
-                    setState(() {
-                      _future = Future.value(downloadAccess);
-                    });
-                  },
-                );
+                }
               },
             ),
           ),
@@ -224,6 +278,7 @@ class _ViewerCard extends StatelessWidget {
     );
   }
 }
+
 
 class _PreviewBox extends StatelessWidget {
   const _PreviewBox({required this.access});

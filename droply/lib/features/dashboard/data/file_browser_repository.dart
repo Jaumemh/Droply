@@ -33,6 +33,7 @@ class FolderItem {
 class FileItem {
   const FileItem({
     required this.id,
+    this.shareId,
     required this.ownerId,
     required this.folderId,
     required this.name,
@@ -48,6 +49,7 @@ class FileItem {
   factory FileItem.fromMap(Map<String, dynamic> map) {
     return FileItem(
       id: map['id'] as String,
+      shareId: map['share_id'] as String?,
       ownerId: map['owner_id'] as String,
       folderId: map['folder_id'] as String?,
       name: map['name'] as String,
@@ -62,6 +64,7 @@ class FileItem {
   }
 
   final String id;
+  final String? shareId;
   final String ownerId;
   final String? folderId;
   final String name;
@@ -124,6 +127,7 @@ abstract class FileBrowserRepositoryBase {
   });
   Future<void> renameFile({required String fileId, required String newName});
   Future<void> deleteFile({required String fileId});
+  Future<void> removeSharedFile({required String shareId});
   Future<List<FolderItem>> loadFolderPath(String? folderId);
   Future<List<FileItem>> loadSharedFiles();
 }
@@ -334,6 +338,17 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     await _client
         .from('files')
         .update({'is_deleted': true}).eq('id', fileId).eq('owner_id', currentUserId);
+  }
+
+  @override
+  Future<void> removeSharedFile({
+    required String shareId,
+  }) async {
+    await _client
+        .from('share_grants')
+        .delete()
+        .eq('share_id', shareId)
+        .eq('recipient_id', currentUserId);
   }
 
   @override

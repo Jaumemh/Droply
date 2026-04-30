@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DashboardView extends StatefulWidget {
@@ -211,6 +212,7 @@ class _DashboardViewState extends State<DashboardView> {
                                 DataColumn(label: Text('Mime')),
                                 DataColumn(label: Text('Tamano')),
                                 DataColumn(label: Text('Ruta')),
+                                DataColumn(label: Text('Acciones')),
                               ],
                               rows: controller.sharedFiles
                                   .map(
@@ -220,6 +222,23 @@ class _DashboardViewState extends State<DashboardView> {
                                         DataCell(Text(file.mimeType)),
                                         DataCell(Text(_formatBytes(file.sizeBytes))),
                                         DataCell(Text(file.storagePath)),
+                                        DataCell(
+                                          Wrap(
+                                            spacing: 8,
+                                            children: [
+                                              TextButton(
+                                                onPressed: () => _downloadSharedFile(context, file),
+                                                child: const Text('Descargar'),
+                                              ),
+                                              TextButton(
+                                                onPressed: file.shareId == null
+                                                    ? null
+                                                    : () => controller.removeSharedFile(file.shareId!),
+                                                child: const Text('Eliminar'),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   )
@@ -233,6 +252,23 @@ class _DashboardViewState extends State<DashboardView> {
         );
       },
     );
+  }
+
+  Future<void> _downloadSharedFile(BuildContext context, FileItem file) async {
+    try {
+      final signedUrl = await Supabase.instance.client.storage
+          .from('droply-files')
+          .createSignedUrl(file.storagePath, 300);
+      final uri = Uri.parse(signedUrl);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on Object catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo descargar el archivo: $error')),
+      );
+    }
   }
 
   Future<void> _showFolderDialog(BuildContext context, DashboardController controller) async {

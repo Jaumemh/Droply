@@ -174,6 +174,14 @@ class DashboardController extends ChangeNotifier {
     });
   }
 
+  Future<void> removeSharedFile(String shareId) async {
+    await _runBusyAction(() async {
+      await _repository.removeSharedFile(shareId: shareId);
+      _infoMessage = 'Archivo quitado de compartidos.';
+      await refresh();
+    });
+  }
+
   Future<ShareLinkResult> createShare({
     required String fileId,
     String? note,
