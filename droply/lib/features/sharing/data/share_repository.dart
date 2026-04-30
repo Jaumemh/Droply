@@ -89,11 +89,37 @@ class ShareRepository {
     );
 
     final map = _firstRow(response);
+    await logEvent(
+      action: 'SHARE_CREATE',
+      fileId: fileId,
+      shareId: map['id'] as String,
+      userAgent: 'flutter',
+      ipClient: null,
+    );
     return ShareLinkResult(
       shareId: map['id'] as String,
       token: map['token'] as String,
       expiresAt: DateTime.parse(map['expires_at'] as String),
     );
+  }
+
+  Future<void> logEvent({
+    required String action,
+    required String fileId,
+    String? shareId,
+    String? userAgent,
+    String? ipClient,
+  }) async {
+    await _client.from('events').insert({
+      'user_id': _client.auth.currentUser?.id,
+      'file_id': fileId,
+      'share_id': shareId,
+      'action': action,
+      'target_type': 'file',
+      'ip_client': ipClient,
+      'user_agent': userAgent,
+      'metadata': <String, dynamic>{},
+    });
   }
 
   Future<ShareAccessResult> resolveShare({

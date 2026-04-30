@@ -218,6 +218,21 @@ class DashboardController extends ChangeNotifier {
     });
   }
 
+  Future<void> recordFileEvent({
+    required String fileId,
+    required String action,
+    String? shareId,
+  }) async {
+    final repository = _shareRepository ?? ShareRepository(_repositoryClient);
+    await repository.logEvent(
+      action: action,
+      fileId: fileId,
+      shareId: shareId,
+      userAgent: 'flutter',
+      ipClient: null,
+    );
+  }
+
   Future<ShareLinkResult> createShare({
     required String fileId,
     String? note,

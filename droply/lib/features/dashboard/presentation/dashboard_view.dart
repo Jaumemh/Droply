@@ -287,6 +287,11 @@ class _DashboardViewState extends State<DashboardView> {
 
   Future<void> _openFilePreview(BuildContext context, FileItem file) async {
     try {
+      await widget.controller.recordFileEvent(
+        fileId: file.id,
+        action: 'PREVIEW',
+        shareId: file.shareId,
+      );
       final signedUrl = await Supabase.instance.client.storage
           .from('droply-files')
           .createSignedUrl(file.storagePath, 300);
