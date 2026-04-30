@@ -8,6 +8,7 @@ import 'package:droply/core/config/env.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ShareViewerPage extends StatefulWidget {
@@ -289,28 +290,83 @@ class _PreviewBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 260),
+      constraints: const BoxConstraints(minHeight: 320),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFDCE4F0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: access.isImage
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: access.signedUrl == null || access.signedUrl!.isEmpty
-                    ? _PreviewFallback(access: access)
-                    : Image.network(
-                        access.signedUrl!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, _) => _PreviewFallback(access: access),
-                      ),
-              )
-            : _PreviewFallback(access: access),
+        padding: const EdgeInsets.all(12),
+        child: _PreviewSurface(access: access),
       ),
     );
+  }
+}
+
+class _PreviewSurface extends StatelessWidget {
+  const _PreviewSurface({required this.access});
+
+  final ShareAccessResult access;
+
+  @override
+  Widget build(BuildContext context) {
+    if (access.signedUrl == null || access.signedUrl!.isEmpty) {
+      return _PreviewFallback(access: access);
+    }
+
+    if (access.isImage) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Image.network(
+          access.signedUrl!,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) {
+              return child;
+            }
+            return const Center(child: CircularProgressIndicator());
+          },
+          errorBuilder: (context, error, _) => _PreviewFallback(access: access),
+        ),
+      );
+    }
+
+    if (access.isPdf) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              color: const Color(0xFFF8FBFF),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: SfPdfViewer.network(
+                access.signedUrl!,
+                canShowScrollHead: false,
+                canShowScrollStatus: false,
+                canShowPaginationDialog: false,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_isDocx(access.mimeType, access.fileName)) {
+      return _DocxPreview(access: access);
+    }
+
+    return _PreviewFallback(access: access);
+  }
+
+  bool _isDocx(String mimeType, String fileName) {
+    final mime = mimeType.toLowerCase();
+    final name = fileName.toLowerCase();
+    return mime.contains('wordprocessingml.document') || name.endsWith('.docx') || name.endsWith('.doc');
   }
 }
 
@@ -328,7 +384,7 @@ class _PreviewFallback extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.description_outlined, size: 72, color: Color(0xFF0066CC)),
+          Icon(_iconForMime(access.mimeType), size: 72, color: const Color(0xFF0066CC)),
           const SizedBox(height: 12),
           Text(
             label,
@@ -340,7 +396,105 @@ class _PreviewFallback extends StatelessWidget {
             access.mimeType,
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: access.signedUrl == null || access.signedUrl!.isEmpty
+                ? null
+                : () async {
+                    await launchUrl(
+                      Uri.parse(access.signedUrl!),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Descarga directa'),
+          ),
         ],
+      ),
+    );
+  }
+
+  IconData _iconForMime(String mimeType) {
+    final mime = mimeType.toLowerCase();
+    if (mime.startsWith('image/')) {
+      return Icons.image_outlined;
+    }
+    if (mime == 'application/pdf') {
+      return Icons.picture_as_pdf_outlined;
+    }
+    if (mime.startsWith('video/')) {
+      return Icons.play_circle_outline;
+    }
+    if (mime.startsWith('audio/')) {
+      return Icons.graphic_eq_outlined;
+    }
+    if (mime.contains('word') || mime.contains('document')) {
+      return Icons.description_outlined;
+    }
+    if (mime.contains('sheet') || mime.contains('excel')) {
+      return Icons.table_chart_outlined;
+    }
+    return Icons.insert_drive_file_outlined;
+  }
+}
+
+class _DocxPreview extends StatelessWidget {
+  const _DocxPreview({required this.access});
+
+  final ShareAccessResult access;
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      final officeUrl = Uri.https(
+        'view.officeapps.live.com',
+        '/op/embed.aspx',
+        {'src': access.signedUrl!},
+      );
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: HtmlPreviewFrame(url: officeUrl.toString()),
+      );
+    }
+
+    return _PreviewFallback(access: access);
+  }
+}
+
+class HtmlPreviewFrame extends StatelessWidget {
+  const HtmlPreviewFrame({super.key, required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF8FBFF),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.description_outlined, size: 72, color: Color(0xFF0066CC)),
+            const SizedBox(height: 12),
+            Text(
+              'Vista previa DOCX en web',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Abre el enlace en una pestaña compatible si no se carga incrustado.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF64748B),
+                  ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+              child: const Text('Abrir vista DOCX'),
+            ),
+          ],
+        ),
       ),
     );
   }
