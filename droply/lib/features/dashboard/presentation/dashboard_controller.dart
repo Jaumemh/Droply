@@ -239,9 +239,14 @@ class DashboardController extends ChangeNotifier {
   Future<ShareLinkResult> createShare({
     required String fileId,
     String? note,
+    String permission = 'read',
   }) async {
     final repository = _shareRepository ?? ShareRepository(_repositoryClient);
-    return repository.createShare(fileId: fileId, note: note);
+    return repository.createShare(
+      fileId: fileId,
+      note: note,
+      permission: permission,
+    );
   }
 
   Future<void> _runBusyAction(Future<void> Function() action) async {

@@ -721,178 +721,291 @@ class _DashboardViewState extends State<DashboardView> {
     FileItem file,
   ) async {
     final noteController = TextEditingController();
+    String selectedPermission = 'download';
+    
     try {
-      final note = await showDialog<String>(
+      final result = await showDialog<Map<String, String>?>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF0EA5E9),
-                      Color(0xFF0284C7),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.share_outlined,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Text(
-                'Compartir archivo',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFF8FBFF),
-                      Color(0xFFF0F7FF),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFD6EAF5),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.insert_drive_file_outlined,
-                      color: Color(0xFF0EA5E9),
-                      size: 20,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF0EA5E9),
+                        Color(0xFF0284C7),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        file.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.share_outlined,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Text(
+                  'Compartir archivo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFF8FBFF),
+                        Color(0xFFF0F7FF),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFD6EAF5),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.insert_drive_file_outlined,
+                        color: Color(0xFF0EA5E9),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          file.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Permisos de acceso',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FBFD),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        value: 'read',
+                        groupValue: selectedPermission,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedPermission = value!;
+                          });
+                        },
+                        title: const Row(
+                          children: [
+                            Icon(
+                              Icons.visibility_outlined,
+                              size: 20,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Solo visualizar',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: const Padding(
+                          padding: EdgeInsets.only(left: 30),
+                          child: Text(
+                            'El usuario podrá ver el archivo pero no descargarlo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        activeColor: const Color(0xFF8B5CF6),
+                      ),
+                      const Divider(height: 1),
+                      RadioListTile<String>(
+                        value: 'download',
+                        groupValue: selectedPermission,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedPermission = value!;
+                          });
+                        },
+                        title: const Row(
+                          children: [
+                            Icon(
+                              Icons.download_outlined,
+                              size: 20,
+                              color: Color(0xFF10B981),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Visualizar y descargar',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: const Padding(
+                          padding: EdgeInsets.only(left: 30),
+                          child: Text(
+                            'El usuario podrá ver y descargar el archivo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        activeColor: const Color(0xFF10B981),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  maxLines: 3,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Nota opcional',
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    helperText: 'Caduca por defecto en 7 días.',
+                    helperStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FBFD),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE2E8F0),
+                        width: 1.5,
                       ),
                     ),
-                  ],
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE2E8F0),
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF0EA5E9),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Cancelar',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: noteController,
-                maxLines: 3,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              FilledButton.icon(
+                onPressed: () => Navigator.of(dialogContext).pop({
+                  'note': noteController.text,
+                  'permission': selectedPermission,
+                }),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0EA5E9),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                decoration: InputDecoration(
-                  labelText: 'Nota opcional',
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  helperText: 'Caduca por defecto en 7 días.',
-                  helperStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FBFD),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE2E8F0),
-                      width: 1.5,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE2E8F0),
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF0EA5E9),
-                      width: 2,
-                    ),
-                  ),
+                icon: const Icon(Icons.link, size: 20),
+                label: const Text(
+                  'Crear enlace',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF64748B),
-                backgroundColor: const Color(0xFFF1F5F9),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(noteController.text),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0EA5E9),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.link, size: 20),
-              label: const Text(
-                'Crear enlace',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
         ),
       );
 
-      if (note == null || !context.mounted) {
+      if (result == null || !context.mounted) {
         return;
       }
 
-      await _createShareLink(context, controller, file, note);
+      await _createShareLink(
+        context,
+        controller,
+        file,
+        result['note'],
+        result['permission'] ?? 'download',
+      );
     } finally {
       noteController.dispose();
     }
@@ -903,9 +1016,14 @@ class _DashboardViewState extends State<DashboardView> {
     DashboardController controller,
     FileItem file,
     String? note,
+    String permission,
   ) async {
     try {
-      final result = await controller.createShare(fileId: file.id, note: note);
+      final result = await controller.createShare(
+        fileId: file.id,
+        note: note,
+        permission: permission,
+      );
       final link = _buildShareLink(result.token).toString();
       if (!context.mounted) {
         return;
@@ -918,7 +1036,7 @@ class _DashboardViewState extends State<DashboardView> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Enlace copiado. Caduca el ${result.expiresAt}.'),
+          content: Text('Enlace copiado. Caduca el ${_formatExpiryDate(result.expiresAt)}.'),
         ),
       );
 
@@ -1339,6 +1457,19 @@ class _DashboardViewState extends State<DashboardView> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _formatExpiryDate(DateTime dateTime) {
+    final months = [
+      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+      'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+    ];
+    final day = dateTime.day;
+    final month = months[dateTime.month - 1];
+    final year = dateTime.year;
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$day $month $year, $hour:$minute';
   }
 }
 

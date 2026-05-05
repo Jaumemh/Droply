@@ -14,6 +14,7 @@ class ShareAccessResult {
     required this.isImage,
     required this.isPdf,
     required this.sizeBytes,
+    required this.permission,
   });
 
   final String shareId;
@@ -27,6 +28,7 @@ class ShareAccessResult {
   final bool isImage;
   final bool isPdf;
   final int sizeBytes;
+  final String permission;
 }
 
 class AcceptedShareResult {
@@ -79,12 +81,14 @@ class ShareRepository {
   Future<ShareLinkResult> createShare({
     required String fileId,
     String? note,
+    String permission = 'read',
   }) async {
     final response = await _client.rpc(
       'create_share_link',
       params: {
         'p_file_id': fileId,
         'p_note': note,
+        'p_permission': permission,
       },
     );
 
@@ -165,6 +169,7 @@ class ShareRepository {
       isImage: map['is_image'] as bool? ?? false,
       isPdf: map['is_pdf'] as bool? ?? false,
       sizeBytes: (map['size_bytes'] as num).toInt(),
+      permission: map['permission'] as String? ?? 'read',
     );
   }
 
