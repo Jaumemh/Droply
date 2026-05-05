@@ -1125,42 +1125,72 @@ class _DriveTopBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFFD6EAF5)),
       ),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          const SizedBox(
-            width: 42,
-            height: 42,
-            child: CustomPaint(painter: _DroplyLogoPainter()),
-          ),
-          Text(
-            'Droply',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: const Color(0xFF0F172A),
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(width: 8),
-          _TopBarButton(
-            label: 'Carpeta',
-            icon: Icons.create_new_folder_outlined,
-            onPressed: controller.isBusy ? null : onCreateFolder,
-          ),
-          _TopBarButton(
-            label: 'Subir',
-            icon: Icons.cloud_upload_outlined,
-            onPressed: controller.isBusy ? null : onUpload,
-            filled: true,
-          ),
-          _TopBarButton(
-            label: 'Salir',
-            icon: Icons.logout_outlined,
-            onPressed: authController.isBusy ? null : onSignOut,
-            danger: true,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final logo = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 42,
+                height: 42,
+                child: CustomPaint(painter: _DroplyLogoPainter()),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Droply',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: const Color(0xFF0F172A),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          );
+
+          final buttons = Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _TopBarButton(
+                label: 'Carpeta',
+                icon: Icons.create_new_folder_outlined,
+                onPressed: controller.isBusy ? null : onCreateFolder,
+              ),
+              _TopBarButton(
+                label: 'Subir',
+                icon: Icons.cloud_upload_outlined,
+                onPressed: controller.isBusy ? null : onUpload,
+                filled: true,
+              ),
+              _TopBarButton(
+                label: 'Salir',
+                icon: Icons.logout_outlined,
+                onPressed: authController.isBusy ? null : onSignOut,
+                danger: true,
+              ),
+            ],
+          );
+
+          // En pantallas pequeñas, usar layout vertical
+          if (constraints.maxWidth < 600) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                logo,
+                const SizedBox(height: 12),
+                buttons,
+              ],
+            );
+          }
+
+          // En pantallas grandes, logo a la izquierda y botones a la derecha
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              logo,
+              buttons,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1471,52 +1501,72 @@ class _SearchAndFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.88),
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            Colors.white.withValues(alpha: 0.95),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFD6EAF5)),
+        border: Border.all(
+          color: const Color(0xFFD6EAF5),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0284C7).withValues(alpha: 0.08),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
+            color: const Color(0xFF0284C7).withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: const Color(0xFF0EA5E9).withValues(alpha: 0.04),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final filters = Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              ChoiceChip(
-                avatar: const Icon(Icons.all_inbox_rounded, size: 18),
-                label: const Text('Todos'),
-                selected: controller.fileTypeFilter == FileTypeFilter.all,
-                onSelected: (_) =>
-                    controller.setFileTypeFilter(FileTypeFilter.all),
+              _buildFilterChip(
+                context: context,
+                icon: Icons.all_inbox_rounded,
+                label: 'Todos',
+                isSelected: controller.fileTypeFilter == FileTypeFilter.all,
+                onSelected: () => controller.setFileTypeFilter(FileTypeFilter.all),
+                color: const Color(0xFF0EA5E9),
               ),
-              ChoiceChip(
-                avatar: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                label: const Text('PDF'),
-                selected: controller.fileTypeFilter == FileTypeFilter.pdf,
-                onSelected: (_) =>
-                    controller.setFileTypeFilter(FileTypeFilter.pdf),
+              _buildFilterChip(
+                context: context,
+                icon: Icons.picture_as_pdf_outlined,
+                label: 'PDF',
+                isSelected: controller.fileTypeFilter == FileTypeFilter.pdf,
+                onSelected: () => controller.setFileTypeFilter(FileTypeFilter.pdf),
+                color: const Color(0xFFEF4444),
               ),
-              ChoiceChip(
-                avatar: const Icon(Icons.image_outlined, size: 18),
-                label: const Text('Imagenes'),
-                selected: controller.fileTypeFilter == FileTypeFilter.images,
-                onSelected: (_) =>
-                    controller.setFileTypeFilter(FileTypeFilter.images),
+              _buildFilterChip(
+                context: context,
+                icon: Icons.image_outlined,
+                label: 'Imágenes',
+                isSelected: controller.fileTypeFilter == FileTypeFilter.images,
+                onSelected: () => controller.setFileTypeFilter(FileTypeFilter.images),
+                color: const Color(0xFF8B5CF6),
               ),
-              ChoiceChip(
-                avatar: const Icon(Icons.more_horiz_rounded, size: 18),
-                label: const Text('Otros'),
-                selected: controller.fileTypeFilter == FileTypeFilter.other,
-                onSelected: (_) =>
-                    controller.setFileTypeFilter(FileTypeFilter.other),
+              _buildFilterChip(
+                context: context,
+                icon: Icons.more_horiz_rounded,
+                label: 'Otros',
+                isSelected: controller.fileTypeFilter == FileTypeFilter.other,
+                onSelected: () => controller.setFileTypeFilter(FileTypeFilter.other),
+                color: const Color(0xFF10B981),
               ),
             ],
           );
@@ -1524,19 +1574,77 @@ class _SearchAndFilterBar extends StatelessWidget {
           final search = TextField(
             controller: TextEditingController(text: controller.searchQuery),
             onChanged: controller.setSearchQuery,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0F172A),
+            ),
             decoration: InputDecoration(
               labelText: 'Buscar por nombre',
-              prefixIcon: const Icon(Icons.search_rounded),
+              labelStyle: TextStyle(
+                color: const Color(0xFF64748B).withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
+              floatingLabelStyle: const TextStyle(
+                color: Color(0xFF0EA5E9),
+                fontWeight: FontWeight.w700,
+              ),
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.search_rounded,
+                  color: Color(0xFF0EA5E9),
+                  size: 22,
+                ),
+              ),
               suffixIcon: controller.searchQuery.isEmpty
                   ? null
                   : IconButton(
                       onPressed: controller.clearSearch,
-                      icon: const Icon(Icons.close_rounded),
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      tooltip: 'Limpiar búsqueda',
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        foregroundColor: const Color(0xFF64748B),
+                      ),
                     ),
               filled: true,
               fillColor: const Color(0xFFF8FBFD),
-              border: OutlineInputBorder(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
+              enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: const Color(0xFFE2E8F0),
+                  width: 1.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: Color(0xFF0EA5E9),
+                  width: 2.5,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: Color(0xFFEF4444),
+                  width: 1.5,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: Color(0xFFEF4444),
+                  width: 2.5,
+                ),
               ),
             ),
           );
@@ -1545,7 +1653,7 @@ class _SearchAndFilterBar extends StatelessWidget {
             return Row(
               children: [
                 Expanded(child: search),
-                const SizedBox(width: 16),
+                const SizedBox(width: 18),
                 filters,
               ],
             );
@@ -1553,9 +1661,84 @@ class _SearchAndFilterBar extends StatelessWidget {
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [search, const SizedBox(height: 14), filters],
+            children: [search, const SizedBox(height: 16), filters],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onSelected,
+    required Color color,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onSelected,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 10,
+            ),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? LinearGradient(
+                      colors: [
+                        color,
+                        color.withValues(alpha: 0.85),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected
+                    ? color.withValues(alpha: 0.3)
+                    : const Color(0xFFE2E8F0),
+                width: isSelected ? 2 : 1.5,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: isSelected ? Colors.white : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1613,7 +1796,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _FolderCard extends StatelessWidget {
+class _FolderCard extends StatefulWidget {
   const _FolderCard({
     required this.folder,
     required this.onOpen,
@@ -1627,113 +1810,257 @@ class _FolderCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
+  State<_FolderCard> createState() => _FolderCardState();
+}
+
+class _FolderCardState extends State<_FolderCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isRootFolder = folder.parentId == null;
+    final isRootFolder = widget.folder.parentId == null;
 
     return SizedBox(
       width: 260,
-      child: Card(
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFFD7E2F2)),
-        ),
-        child: InkWell(
-          onTap: onOpen,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF2FF),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.folder_rounded,
-                    color: Color(0xFF0066CC),
-                    size: 34,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  folder.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF172033),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F8FB),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFE3EAF5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isRootFolder
-                            ? Icons.account_tree_outlined
-                            : Icons.subdirectory_arrow_right_outlined,
-                        color: const Color(0xFF5C6F8C),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isRootFolder ? 'Carpeta raiz' : 'Subcarpeta',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF5C6F8C),
-                          fontWeight: FontWeight.w600,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.identity()
+            ..translate(0.0, _isHovered ? -6.0 : 0.0),
+          child: Card(
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: BorderSide(
+                color: _isHovered
+                    ? const Color(0xFF0EA5E9).withValues(alpha: 0.4)
+                    : const Color(0xFFD7E2F2),
+                width: _isHovered ? 2 : 1.5,
+              ),
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: _isHovered
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF0EA5E9).withValues(alpha: 0.03),
+                          const Color(0xFF0EA5E9).withValues(alpha: 0.08),
+                        ],
+                      )
+                    : null,
+                boxShadow: _isHovered
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                          spreadRadius: 2,
                         ),
+                        BoxShadow(
+                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.08),
+                          blurRadius: 40,
+                          offset: const Offset(0, 20),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: const Color(0xFF64748B).withValues(alpha: 0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+              ),
+              child: InkWell(
+                onTap: widget.onOpen,
+                borderRadius: BorderRadius.circular(22),
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: _isHovered
+                                ? [
+                                    const Color(0xFF0EA5E9),
+                                    const Color(0xFF0284C7),
+                                  ]
+                                : [
+                                    const Color(0xFFEAF2FF),
+                                    const Color(0xFFDBE9FF),
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: _isHovered
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.3),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Icon(
+                          _isHovered
+                              ? Icons.folder_open_rounded
+                              : Icons.folder_rounded,
+                          color: _isHovered
+                              ? Colors.white
+                              : const Color(0xFF0066CC),
+                          size: 36,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        widget.folder.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF172033),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFF6F8FB),
+                              const Color(0xFFF1F5F9),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: const Color(0xFFE3EAF5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isRootFolder
+                                  ? Icons.account_tree_outlined
+                                  : Icons.subdirectory_arrow_right_outlined,
+                              color: const Color(0xFF5C6F8C),
+                              size: 17,
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              isRootFolder ? 'Carpeta raíz' : 'Subcarpeta',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF5C6F8C),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildActionButton(
+                            tooltip: 'Abrir',
+                            icon: Icons.folder_open_outlined,
+                            onPressed: widget.onOpen,
+                            color: const Color(0xFF0EA5E9),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildActionButton(
+                            tooltip: 'Renombrar',
+                            icon: Icons.edit_outlined,
+                            onPressed: widget.onRename,
+                            color: const Color(0xFF8B5CF6),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildActionButton(
+                            tooltip: 'Eliminar',
+                            icon: Icons.delete_outline,
+                            onPressed: widget.onDelete,
+                            color: const Color(0xFFEF4444),
+                            isDanger: true,
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton.filledTonal(
-                      tooltip: 'Abrir',
-                      onPressed: onOpen,
-                      icon: const Icon(Icons.folder_open_outlined),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onPressed,
+    required Color color,
+    bool isDanger = false,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: isDanger
+                  ? null
+                  : LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0.12),
+                        color.withValues(alpha: 0.18),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    const SizedBox(width: 10),
-                    IconButton.filledTonal(
-                      tooltip: 'Renombrar',
-                      onPressed: onRename,
-                      icon: const Icon(Icons.edit_outlined),
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton(
-                      tooltip: 'Eliminar',
-                      onPressed: onDelete,
-                      icon: const Icon(Icons.delete_outline),
-                      style: IconButton.styleFrom(
-                        foregroundColor: const Color(0xFFB42318),
-                        backgroundColor: const Color(0xFFFFEDEA),
-                        hoverColor: const Color(0xFFFFD7D1),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              color: isDanger
+                  ? const Color(0xFFFFEDEA)
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDanger
+                    ? const Color(0xFFFFD7D1)
+                    : color.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isDanger ? const Color(0xFFB42318) : color,
+              size: 20,
             ),
           ),
         ),
@@ -1842,7 +2169,7 @@ class _FileAction {
   final VoidCallback? onPressed;
 }
 
-class _FileCard extends StatelessWidget {
+class _FileCard extends StatefulWidget {
   const _FileCard({
     required this.title,
     required this.subtitle,
@@ -1862,92 +2189,183 @@ class _FileCard extends StatelessWidget {
   static const _titleHeight = 48.0;
 
   @override
+  State<_FileCard> createState() => _FileCardState();
+}
+
+class _FileCardState extends State<_FileCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: _cardHeight),
-      child: Card(
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFFD7E2F2)),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: accent.withValues(alpha: 0.18)),
-                  ),
-                  child: Icon(icon, color: accent, size: 30),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: _titleHeight,
-                  child: Center(
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF172033),
-                        fontWeight: FontWeight.w800,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.identity()
+          ..translate(0.0, _isHovered ? -6.0 : 0.0),
+        constraints: const BoxConstraints(minHeight: _FileCard._cardHeight),
+        child: Card(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(
+              color: _isHovered
+                  ? widget.accent.withValues(alpha: 0.4)
+                  : const Color(0xFFD7E2F2),
+              width: _isHovered ? 2 : 1.5,
+            ),
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: _isHovered
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        widget.accent.withValues(alpha: 0.03),
+                        widget.accent.withValues(alpha: 0.08),
+                      ],
+                    )
+                  : null,
+              boxShadow: _isHovered
+                  ? [
+                      BoxShadow(
+                        color: widget.accent.withValues(alpha: 0.15),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                        spreadRadius: 2,
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F8FB),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFE3EAF5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.sd_storage_outlined,
-                        color: Color(0xFF5C6F8C),
-                        size: 16,
+                      BoxShadow(
+                        color: widget.accent.withValues(alpha: 0.08),
+                        blurRadius: 40,
+                        offset: const Offset(0, 20),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF5C6F8C),
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: const Color(0xFF64748B).withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
-                  ),
+            ),
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            widget.accent.withValues(alpha: _isHovered ? 0.18 : 0.12),
+                            widget.accent.withValues(alpha: _isHovered ? 0.25 : 0.18),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: widget.accent.withValues(alpha: _isHovered ? 0.35 : 0.22),
+                          width: _isHovered ? 2 : 1.5,
+                        ),
+                        boxShadow: _isHovered
+                            ? [
+                                BoxShadow(
+                                  color: widget.accent.withValues(alpha: 0.25),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Icon(
+                        widget.icon,
+                        color: widget.accent,
+                        size: _isHovered ? 34 : 30,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      height: _FileCard._titleHeight,
+                      child: Center(
+                        child: Text(
+                          widget.title,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFF172033),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFF6F8FB),
+                            const Color(0xFFF1F5F9),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFFE3EAF5),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.sd_storage_outlined,
+                            color: const Color(0xFF5C6F8C),
+                            size: 17,
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            widget.subtitle,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF5C6F8C),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: widget.actions.map(_buildActionButton).toList(),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 18),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: actions.map(_buildActionButton).toList(),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -1960,21 +2378,50 @@ class _FileCard extends StatelessWidget {
         action.icon == Icons.delete_outline ||
         action.icon == Icons.remove_circle_outline;
 
-    return IconButton(
-      tooltip: action.label,
-      onPressed: action.onPressed,
-      icon: Icon(action.icon, size: 20),
-      style: IconButton.styleFrom(
-        fixedSize: const Size.square(42),
-        foregroundColor: isDangerAction ? const Color(0xFFB42318) : accent,
-        backgroundColor: isDangerAction
-            ? const Color(0xFFFFEDEA)
-            : accent.withValues(alpha: 0.10),
-        disabledForegroundColor: const Color(0xFF94A3B8),
-        disabledBackgroundColor: const Color(0xFFF1F5F9),
-        hoverColor: isDangerAction
-            ? const Color(0xFFFFD7D1)
-            : accent.withValues(alpha: 0.16),
+    return Tooltip(
+      message: action.label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: action.onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: isDangerAction
+                  ? LinearGradient(
+                      colors: [
+                        const Color(0xFFFFEDEA),
+                        const Color(0xFFFFE1DC),
+                      ],
+                    )
+                  : LinearGradient(
+                      colors: [
+                        widget.accent.withValues(alpha: 0.12),
+                        widget.accent.withValues(alpha: 0.18),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDangerAction
+                    ? const Color(0xFFFFD7D1)
+                    : widget.accent.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(
+              action.icon,
+              color: isDangerAction
+                  ? const Color(0xFFB42318)
+                  : widget.accent,
+              size: 20,
+            ),
+          ),
+        ),
       ),
     );
   }
