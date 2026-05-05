@@ -85,9 +85,8 @@ class _DroplyAppState extends State<DroplyApp> {
   }
 
   Widget _buildEntryPage() {
-    final uri = Uri.base;
-    if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'share') {
-      final token = uri.pathSegments.length > 1 ? uri.pathSegments[1] : '';
+    final token = _shareTokenFromUri(Uri.base);
+    if (token != null) {
       return ShareViewerPage(token: token);
     }
 
@@ -95,6 +94,31 @@ class _DroplyAppState extends State<DroplyApp> {
       controller: _controller,
       dashboardController: _dashboardController,
     );
+  }
+
+  String? _shareTokenFromUri(Uri uri) {
+    final pathToken = _shareTokenFromSegments(uri.pathSegments);
+    if (pathToken != null) {
+      return pathToken;
+    }
+
+    if (uri.fragment.isEmpty) {
+      return null;
+    }
+
+    final fragmentPath = uri.fragment.startsWith('/')
+        ? uri.fragment
+        : '/${uri.fragment}';
+    final fragmentUri = Uri.parse(fragmentPath);
+    return _shareTokenFromSegments(fragmentUri.pathSegments);
+  }
+
+  String? _shareTokenFromSegments(List<String> segments) {
+    if (segments.isEmpty || segments.first != 'share') {
+      return null;
+    }
+
+    return segments.length > 1 ? segments[1] : '';
   }
 
   AuthController _createDefaultController() {

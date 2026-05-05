@@ -206,7 +206,7 @@ class _VisitorCard extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Icon(_iconForMime(access.mimeType), size: 72, color: const Color(0xFF0066CC)),
+                  _previewForAccess(access),
                   const SizedBox(height: 12),
                   Text(
                     'Enlace temporal generado con Droply',
@@ -248,6 +248,47 @@ class _VisitorCard extends StatelessWidget {
     return '${kb.toStringAsFixed(1)} KB';
   }
 
+  Widget _previewForAccess(ShareAccessResult access) {
+    final signedUrl = access.signedUrl;
+    if ((access.isImage || _isImageFileName(access.fileName)) &&
+        signedUrl != null &&
+        signedUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 260),
+          child: Image.network(
+            signedUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => _fileIcon(access.mimeType),
+          ),
+        ),
+      );
+    }
+
+    return _fileIcon(access.mimeType);
+  }
+
+  bool _isImageFileName(String fileName) {
+    final name = fileName.toLowerCase();
+    return name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.png') ||
+        name.endsWith('.webp') ||
+        name.endsWith('.gif') ||
+        name.endsWith('.svg') ||
+        name.endsWith('.heic') ||
+        name.endsWith('.heif') ||
+        name.endsWith('.avif') ||
+        name.endsWith('.bmp') ||
+        name.endsWith('.tif') ||
+        name.endsWith('.tiff');
+  }
+
+  Widget _fileIcon(String mimeType) {
+    return Icon(_iconForMime(mimeType), size: 72, color: const Color(0xFF0066CC));
+  }
+
   IconData _iconForMime(String mimeType) {
     final mime = mimeType.toLowerCase();
     if (mime.startsWith('image/')) {
@@ -262,4 +303,3 @@ class _VisitorCard extends StatelessWidget {
     return Icons.insert_drive_file_outlined;
   }
 }
-

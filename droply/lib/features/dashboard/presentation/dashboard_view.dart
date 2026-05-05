@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:droply/features/dashboard/data/file_browser_repository.dart';
 import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
@@ -41,226 +43,285 @@ class _DashboardViewState extends State<DashboardView> {
         final theme = Theme.of(context);
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Droply'),
-            actions: [
-              TextButton.icon(
-                onPressed: controller.isBusy ? null : () => _showFolderDialog(context, controller),
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('Carpeta'),
+          body: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFF8FDFF),
+                  Color(0xFFEAF8FF),
+                  Color(0xFFF7FBFF),
+                ],
               ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: controller.isBusy ? null : () => _showUploadMenu(context, controller),
-                icon: const Icon(Icons.cloud_upload_outlined),
-                label: const Text('Subir'),
-              ),
-              const SizedBox(width: 12),
-              TextButton.icon(
-                onPressed: widget.authController.isBusy
-                    ? null
-                    : () => widget.authController.signOut(),
-                icon: const Icon(Icons.logout_outlined),
-                label: const Text('Salir'),
-              ),
-              const SizedBox(width: 12),
-            ],
-          ),
-          body: SafeArea(
-            child: controller.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      _Header(
-                        controller: controller,
-                        userEmail: widget.userEmail,
-                        onGoRoot: () => controller.openFolder(null),
-                        onRefresh: controller.isBusy ? null : controller.refresh,
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 20),
-                      if (controller.uploadMessage != null) ...[
-                        _Banner(
-                          color: const Color(0xFFEAF2FF),
-                          textColor: const Color(0xFF0057B2),
-                          text: controller.uploadMessage!,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (controller.errorMessage != null) ...[
-                        _Banner(
-                          color: const Color(0xFFFEE2E2),
-                          textColor: const Color(0xFF991B1B),
-                          text: controller.errorMessage!,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (controller.infoMessage != null) ...[
-                        _Banner(
-                          color: const Color(0xFFE0F2FE),
-                          textColor: const Color(0xFF075985),
-                          text: controller.infoMessage!,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (controller.isUploading) ...[
-                        _UploadProgressCard(controller: controller),
-                        const SizedBox(height: 16),
-                      ],
-                      _Actions(
-                        onCreateFolder: () => _showFolderDialog(context, controller),
-                        onCreateFile: () => _showUploadMenu(context, controller),
-                      ),
-                      const SizedBox(height: 20),
-                      _SearchAndFilterBar(controller: controller),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Carpetas',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
-                      if (controller.folders.isEmpty)
-                        const _EmptyState(label: 'No hay carpetas en este nivel.')
-                      else
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 16,
-                          runSpacing: 16,
-                          children: controller.folders
-                              .map(
-                                (folder) => _FolderCard(
-                                  folder: folder,
-                                  onOpen: () => controller.openFolder(folder.id),
-                                  onRename: () => _showRenameFolderDialog(context, controller, folder),
-                                  onDelete: () => controller.deleteFolder(folder.id),
-                                ),
+            ),
+            child: Stack(
+              children: [
+                const Positioned.fill(
+                  child: CustomPaint(painter: _DriveBackgroundPainter()),
+                ),
+                SafeArea(
+                  child: controller.isLoading
+                      ? const _DriveLoadingState()
+                      : ListView(
+                          padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
+                          children: [
+                            _DriveTopBar(
+                              controller: controller,
+                              authController: widget.authController,
+                              onCreateFolder: () =>
+                                  _showFolderDialog(context, controller),
+                              onUpload: () =>
+                                  _showUploadMenu(context, controller),
+                              onSignOut: () => widget.authController.signOut(),
+                            ),
+                            const SizedBox(height: 22),
+                            _Header(
+                              controller: controller,
+                              userEmail: widget.userEmail,
+                              onGoRoot: () => controller.openFolder(null),
+                              onRefresh: controller.isBusy
+                                  ? null
+                                  : controller.refresh,
+                              theme: theme,
+                            ),
+                            const SizedBox(height: 20),
+                            if (controller.uploadMessage != null) ...[
+                              _Banner(
+                                color: const Color(0xFFEAF2FF),
+                                textColor: const Color(0xFF0057B2),
+                                text: controller.uploadMessage!,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (controller.errorMessage != null) ...[
+                              _Banner(
+                                color: const Color(0xFFFEE2E2),
+                                textColor: const Color(0xFF991B1B),
+                                text: controller.errorMessage!,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (controller.infoMessage != null) ...[
+                              _Banner(
+                                color: const Color(0xFFE0F2FE),
+                                textColor: const Color(0xFF075985),
+                                text: controller.infoMessage!,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (controller.isUploading) ...[
+                              _UploadProgressCard(controller: controller),
+                              const SizedBox(height: 16),
+                            ],
+                            _SearchAndFilterBar(controller: controller),
+                            const SizedBox(height: 20),
+                            _SectionHeader(
+                              icon: Icons.folder_rounded,
+                              title: 'Carpetas',
+                              subtitle:
+                                  '${controller.folders.length} en este nivel',
+                            ),
+                            const SizedBox(height: 12),
+                            if (controller.folders.isEmpty)
+                              const _EmptyState(
+                                icon: Icons.create_new_folder_outlined,
+                                title: 'No hay carpetas en este nivel',
+                                label:
+                                    'Crea una carpeta para organizar esta zona.',
                               )
-                              .toList(),
-                        ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Archivos',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
-                      if (controller.files.isEmpty)
-                        const _EmptyState(label: 'No hay archivos en esta carpeta.')
-                      else
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final columns = constraints.maxWidth >= 1100
-                                ? 3
-                                : constraints.maxWidth >= 700
-                                    ? 2
-                                    : 1;
-                            return Wrap(
-                              alignment: WrapAlignment.center,
-                              spacing: 16,
-                              runSpacing: 16,
-                              children: controller.files
-                                  .map(
-                                    (file) => SizedBox(
-                                      width: _cardWidth(constraints.maxWidth, columns),
-                                      child: _FileCard(
-                                        title: file.name,
-                                        subtitle: _formatBytes(file.sizeBytes),
-                                        icon: _iconForFile(file),
-                                        accent: const Color(0xFF0066CC),
-                                        onTap: () => _openFilePreview(context, file),
-                                        actions: [
-                                          _FileAction(
-                                            label: 'Renombrar',
-                                            icon: Icons.edit_outlined,
-                                            onPressed: () => _showRenameFileDialog(
-                                              context,
-                                              controller,
-                                              file,
+                            else
+                              Wrap(
+                                alignment: WrapAlignment.start,
+                                spacing: 16,
+                                runSpacing: 16,
+                                children: controller.folders
+                                    .map(
+                                      (folder) => _FolderCard(
+                                        folder: folder,
+                                        onOpen: () =>
+                                            controller.openFolder(folder.id),
+                                        onRename: () => _showRenameFolderDialog(
+                                          context,
+                                          controller,
+                                          folder,
+                                        ),
+                                        onDelete: () =>
+                                            controller.deleteFolder(folder.id),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            const SizedBox(height: 24),
+                            _SectionHeader(
+                              icon: Icons.insert_drive_file_outlined,
+                              title: 'Archivos',
+                              subtitle:
+                                  '${controller.files.length} encontrados',
+                            ),
+                            const SizedBox(height: 12),
+                            if (controller.files.isEmpty)
+                              const _EmptyState(
+                                icon: Icons.upload_file_outlined,
+                                title: 'No hay archivos en esta carpeta',
+                                label:
+                                    'Sube un archivo o cambia el filtro de busqueda.',
+                              )
+                            else
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final columns = constraints.maxWidth >= 1100
+                                      ? 3
+                                      : constraints.maxWidth >= 700
+                                      ? 2
+                                      : 1;
+                                  return Wrap(
+                                    alignment: WrapAlignment.start,
+                                    spacing: 16,
+                                    runSpacing: 16,
+                                    children: controller.files
+                                        .map(
+                                          (file) => SizedBox(
+                                            width: _cardWidth(
+                                              constraints.maxWidth,
+                                              columns,
+                                            ),
+                                            child: _FileCard(
+                                              title: file.name,
+                                              subtitle: _formatBytes(
+                                                file.sizeBytes,
+                                              ),
+                                              icon: _iconForFile(file),
+                                              accent: const Color(0xFF0EA5E9),
+                                              onTap: () => _openFilePreview(
+                                                context,
+                                                file,
+                                              ),
+                                              actions: [
+                                                _FileAction(
+                                                  label: 'Renombrar',
+                                                  icon: Icons.edit_outlined,
+                                                  onPressed: () =>
+                                                      _showRenameFileDialog(
+                                                        context,
+                                                        controller,
+                                                        file,
+                                                      ),
+                                                ),
+                                                _FileAction(
+                                                  label: 'Mover',
+                                                  icon: Icons
+                                                      .drive_file_move_outlined,
+                                                  onPressed: () =>
+                                                      _showMoveFileDialog(
+                                                        context,
+                                                        controller,
+                                                        file,
+                                                      ),
+                                                ),
+                                                _FileAction(
+                                                  label: 'Compartir',
+                                                  icon: Icons.share_outlined,
+                                                  onPressed: () => _shareFile(
+                                                    context,
+                                                    controller,
+                                                    file,
+                                                  ),
+                                                ),
+                                                _FileAction(
+                                                  label: 'Eliminar',
+                                                  icon: Icons.delete_outline,
+                                                  onPressed: () => controller
+                                                      .deleteFile(file.id),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          _FileAction(
-                                            label: 'Mover',
-                                            icon: Icons.drive_file_move_outlined,
-                                            onPressed: () => _showMoveFileDialog(
-                                              context,
-                                              controller,
-                                              file,
+                                        )
+                                        .toList(),
+                                  );
+                                },
+                              ),
+                            const SizedBox(height: 24),
+                            _SectionHeader(
+                              icon: Icons.group_rounded,
+                              title: 'Compartidos conmigo',
+                              subtitle:
+                                  '${controller.sharedFiles.length} archivos aceptados',
+                            ),
+                            const SizedBox(height: 12),
+                            if (controller.sharedFiles.isEmpty)
+                              const _EmptyState(
+                                icon: Icons.link_off_rounded,
+                                title: 'Sin compartidos aceptados',
+                                label:
+                                    'Los archivos compartidos contigo apareceran aqui.',
+                              )
+                            else
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final columns = constraints.maxWidth >= 1100
+                                      ? 3
+                                      : constraints.maxWidth >= 700
+                                      ? 2
+                                      : 1;
+                                  return Wrap(
+                                    alignment: WrapAlignment.start,
+                                    spacing: 16,
+                                    runSpacing: 16,
+                                    children: controller.sharedFiles
+                                        .map(
+                                          (file) => SizedBox(
+                                            width: _cardWidth(
+                                              constraints.maxWidth,
+                                              columns,
+                                            ),
+                                            child: _FileCard(
+                                              title: file.name,
+                                              subtitle: _formatBytes(
+                                                file.sizeBytes,
+                                              ),
+                                              icon: _iconForFile(file),
+                                              accent: const Color(0xFF1D4ED8),
+                                              onTap: () => _openFilePreview(
+                                                context,
+                                                file,
+                                              ),
+                                              actions: [
+                                                _FileAction(
+                                                  label: 'Descargar',
+                                                  icon: Icons.download_outlined,
+                                                  onPressed: () =>
+                                                      _downloadSharedFile(
+                                                        context,
+                                                        file,
+                                                      ),
+                                                ),
+                                                _FileAction(
+                                                  label: 'Quitar',
+                                                  icon: Icons
+                                                      .remove_circle_outline,
+                                                  onPressed:
+                                                      file.shareId == null
+                                                      ? null
+                                                      : () => controller
+                                                            .removeSharedFile(
+                                                              file.shareId!,
+                                                            ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          _FileAction(
-                                            label: 'Compartir',
-                                            icon: Icons.share_outlined,
-                                            onPressed: () => _shareFile(context, controller, file),
-                                          ),
-                                          _FileAction(
-                                            label: 'Eliminar',
-                                            icon: Icons.delete_outline,
-                                            onPressed: () => controller.deleteFile(file.id),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            );
-                          },
+                                        )
+                                        .toList(),
+                                  );
+                                },
+                              ),
+                          ],
                         ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Compartidos conmigo',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
-                      if (controller.sharedFiles.isEmpty)
-                        const _EmptyState(label: 'Aun no tienes archivos compartidos aceptados.')
-                      else
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final columns = constraints.maxWidth >= 1100
-                                ? 3
-                                : constraints.maxWidth >= 700
-                                    ? 2
-                                    : 1;
-                            return Wrap(
-                              alignment: WrapAlignment.center,
-                              spacing: 16,
-                              runSpacing: 16,
-                              children: controller.sharedFiles
-                                  .map(
-                                    (file) => SizedBox(
-                                      width: _cardWidth(constraints.maxWidth, columns),
-                                      child: _FileCard(
-                                        title: file.name,
-                                        subtitle: _formatBytes(file.sizeBytes),
-                                        icon: _iconForFile(file),
-                                        accent: const Color(0xFF1D4ED8),
-                                        onTap: () => _openFilePreview(context, file),
-                                        actions: [
-                                          _FileAction(
-                                            label: 'Descargar',
-                                            icon: Icons.download_outlined,
-                                            onPressed: () => _downloadSharedFile(context, file),
-                                          ),
-                                          _FileAction(
-                                            label: 'Quitar',
-                                            icon: Icons.remove_circle_outline,
-                                            onPressed: file.shareId == null
-                                                ? null
-                                                : () => controller.removeSharedFile(file.shareId!),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -319,8 +380,8 @@ class _DashboardViewState extends State<DashboardView> {
                   Text(
                     file.name,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Expanded(
@@ -354,13 +415,22 @@ class _DashboardViewState extends State<DashboardView> {
 
   Widget _previewForFile(FileItem file, String signedUrl) {
     final mime = file.mimeType.toLowerCase();
-    final isImage = mime.startsWith('image/') ||
+    final isImage =
+        mime.startsWith('image/') ||
         file.name.toLowerCase().endsWith('.jpg') ||
         file.name.toLowerCase().endsWith('.jpeg') ||
         file.name.toLowerCase().endsWith('.png') ||
         file.name.toLowerCase().endsWith('.webp') ||
-        file.name.toLowerCase().endsWith('.gif');
-    final isPdf = mime == 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        file.name.toLowerCase().endsWith('.gif') ||
+        file.name.toLowerCase().endsWith('.svg') ||
+        file.name.toLowerCase().endsWith('.heic') ||
+        file.name.toLowerCase().endsWith('.heif') ||
+        file.name.toLowerCase().endsWith('.avif') ||
+        file.name.toLowerCase().endsWith('.bmp') ||
+        file.name.toLowerCase().endsWith('.tif') ||
+        file.name.toLowerCase().endsWith('.tiff');
+    final isPdf =
+        mime == 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
     if (isImage) {
       return Stack(
@@ -377,7 +447,8 @@ class _DashboardViewState extends State<DashboardView> {
                 }
                 return const Center(child: CircularProgressIndicator());
               },
-              errorBuilder: (_, __, ___) => _previewFallback(file),
+              errorBuilder: (context, error, stackTrace) =>
+                  _previewFallback(file),
             ),
           ),
         ],
@@ -416,17 +487,17 @@ class _DashboardViewState extends State<DashboardView> {
           Text(
             file.name,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             'Formato no previsualizable dentro de la tarjeta',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF64748B),
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF64748B)),
           ),
         ],
       ),
@@ -438,22 +509,26 @@ class _DashboardViewState extends State<DashboardView> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.description_outlined, size: 72, color: Color(0xFF0066CC)),
+          const Icon(
+            Icons.description_outlined,
+            size: 72,
+            color: Color(0xFF0066CC),
+          ),
           const SizedBox(height: 12),
           Text(
             file.name,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             'Vista previa DOCX disponible en navegador',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF64748B),
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF64748B)),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -476,10 +551,15 @@ class _DashboardViewState extends State<DashboardView> {
   bool _isDocx(FileItem file) {
     final mime = file.mimeType.toLowerCase();
     final name = file.name.toLowerCase();
-    return mime.contains('wordprocessingml.document') || name.endsWith('.docx') || name.endsWith('.doc');
+    return mime.contains('wordprocessingml.document') ||
+        name.endsWith('.docx') ||
+        name.endsWith('.doc');
   }
 
-  Future<void> _showFolderDialog(BuildContext context, DashboardController controller) async {
+  Future<void> _showFolderDialog(
+    BuildContext context,
+    DashboardController controller,
+  ) async {
     final nameController = TextEditingController();
     await showDialog<void>(
       context: context,
@@ -589,7 +669,10 @@ class _DashboardViewState extends State<DashboardView> {
             return AlertDialog(
               title: const Text('Mover archivo'),
               content: DropdownButtonFormField<String?>(
-                value: folders.any((folder) => folder.id == selectedFolderId) ? selectedFolderId : null,
+                initialValue:
+                    folders.any((folder) => folder.id == selectedFolderId)
+                    ? selectedFolderId
+                    : null,
                 decoration: const InputDecoration(labelText: 'Carpeta destino'),
                 items: [
                   const DropdownMenuItem<String?>(
@@ -638,32 +721,40 @@ class _DashboardViewState extends State<DashboardView> {
     FileItem file,
   ) async {
     final noteController = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Compartir archivo'),
-        content: TextField(
-          controller: noteController,
-          decoration: const InputDecoration(
-            labelText: 'Nota opcional',
-            helperText: 'Caduca por defecto en 7 dias.',
+    try {
+      final note = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Compartir archivo'),
+          content: TextField(
+            controller: noteController,
+            decoration: const InputDecoration(
+              labelText: 'Nota opcional',
+              helperText: 'Caduca por defecto en 7 dias.',
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(noteController.text),
+              child: const Text('Crear enlace'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-      await _createShareLink(context, controller, file, noteController.text);
-            },
-            child: const Text('Crear enlace'),
-          ),
-        ],
-      ),
-    );
+      );
+
+      if (note == null || !context.mounted) {
+        return;
+      }
+
+      await _createShareLink(context, controller, file, note);
+    } finally {
+      noteController.dispose();
+    }
   }
 
   Future<void> _createShareLink(
@@ -674,7 +765,7 @@ class _DashboardViewState extends State<DashboardView> {
   ) async {
     try {
       final result = await controller.createShare(fileId: file.id, note: note);
-      final link = Uri.base.resolve('/share/${result.token}').toString();
+      final link = _buildShareLink(result.token).toString();
       if (!context.mounted) {
         return;
       }
@@ -685,7 +776,9 @@ class _DashboardViewState extends State<DashboardView> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enlace copiado. Caduca el ${result.expiresAt}.')),
+        SnackBar(
+          content: Text('Enlace copiado. Caduca el ${result.expiresAt}.'),
+        ),
       );
 
       await showDialog<void>(
@@ -696,7 +789,10 @@ class _DashboardViewState extends State<DashboardView> {
           actions: [
             TextButton(
               onPressed: () async {
-                await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                await launchUrl(
+                  Uri.parse(link),
+                  mode: LaunchMode.externalApplication,
+                );
               },
               child: const Text('Abrir'),
             ),
@@ -717,7 +813,17 @@ class _DashboardViewState extends State<DashboardView> {
     }
   }
 
-  Future<void> _showUploadMenu(BuildContext context, DashboardController controller) async {
+  Uri _buildShareLink(String token) {
+    return Uri.base.replace(
+      fragment: '/share/${Uri.encodeComponent(token)}',
+      query: null,
+    );
+  }
+
+  Future<void> _showUploadMenu(
+    BuildContext context,
+    DashboardController controller,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -739,7 +845,9 @@ class _DashboardViewState extends State<DashboardView> {
               ListTile(
                 leading: const Icon(Icons.folder_open_outlined),
                 title: const Text('Abrir archivos'),
-                subtitle: const Text('Selecciona cualquier archivo hasta 50 MB'),
+                subtitle: const Text(
+                  'Selecciona cualquier archivo hasta 50 MB',
+                ),
                 onTap: () async {
                   Navigator.of(context).pop();
                   await _pickFromFiles(controller);
@@ -762,7 +870,9 @@ class _DashboardViewState extends State<DashboardView> {
 
       final bytes = await image.readAsBytes();
       final fileName = image.name;
-      final extension = fileName.contains('.') ? fileName.split('.').last : 'jpg';
+      final extension = fileName.contains('.')
+          ? fileName.split('.').last
+          : 'jpg';
       await controller.uploadFile(
         bytes: bytes,
         name: fileName,
@@ -770,7 +880,9 @@ class _DashboardViewState extends State<DashboardView> {
         extension: extension,
       );
     } on MissingPluginException {
-      _showPickerError('La galeria aun no esta registrada. Haz un reinicio completo de la app.');
+      _showPickerError(
+        'La galeria aun no esta registrada. Haz un reinicio completo de la app.',
+      );
     } on Object catch (error) {
       _showPickerError('No se pudo abrir la galeria: $error');
     }
@@ -794,7 +906,9 @@ class _DashboardViewState extends State<DashboardView> {
         extension: extension,
       );
     } on Error catch (_) {
-      _showPickerError('El selector de archivos aun no esta inicializado. Haz un reinicio completo de la app.');
+      _showPickerError(
+        'El selector de archivos aun no esta inicializado. Haz un reinicio completo de la app.',
+      );
     } on Object catch (error) {
       _showPickerError('No se pudo abrir el explorador de archivos: $error');
     }
@@ -813,6 +927,17 @@ class _DashboardViewState extends State<DashboardView> {
         return 'image/gif';
       case 'svg':
         return 'image/svg+xml';
+      case 'heic':
+        return 'image/heic';
+      case 'heif':
+        return 'image/heif';
+      case 'avif':
+        return 'image/avif';
+      case 'bmp':
+        return 'image/bmp';
+      case 'tif':
+      case 'tiff':
+        return 'image/tiff';
       case 'pdf':
         return 'application/pdf';
       case 'txt':
@@ -877,7 +1002,19 @@ class _DashboardViewState extends State<DashboardView> {
   IconData _iconForFile(FileItem file) {
     final mime = file.mimeType.toLowerCase();
     final name = file.name.toLowerCase();
-    if (mime.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+    if (mime.startsWith('image/') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.png') ||
+        name.endsWith('.webp') ||
+        name.endsWith('.gif') ||
+        name.endsWith('.svg') ||
+        name.endsWith('.heic') ||
+        name.endsWith('.heif') ||
+        name.endsWith('.avif') ||
+        name.endsWith('.bmp') ||
+        name.endsWith('.tif') ||
+        name.endsWith('.tiff')) {
       return Icons.image_outlined;
     }
     if (mime == 'application/pdf' || name.endsWith('.pdf')) {
@@ -903,9 +1040,9 @@ class _DashboardViewState extends State<DashboardView> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -933,9 +1070,9 @@ class _UploadProgressCard extends StatelessWidget {
             Text(
               'Subiendo archivo...',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0057B2),
-                  ),
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0057B2),
+              ),
             ),
             const SizedBox(height: 12),
             ClipRRect(
@@ -964,6 +1101,122 @@ class _UploadProgressCard extends StatelessWidget {
   }
 }
 
+class _DriveTopBar extends StatelessWidget {
+  const _DriveTopBar({
+    required this.controller,
+    required this.authController,
+    required this.onCreateFolder,
+    required this.onUpload,
+    required this.onSignOut,
+  });
+
+  final DashboardController controller;
+  final AuthController authController;
+  final VoidCallback onCreateFolder;
+  final VoidCallback onUpload;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFD6EAF5)),
+      ),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          const SizedBox(
+            width: 42,
+            height: 42,
+            child: CustomPaint(painter: _DroplyLogoPainter()),
+          ),
+          Text(
+            'Droply',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: const Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 8),
+          _TopBarButton(
+            label: 'Carpeta',
+            icon: Icons.create_new_folder_outlined,
+            onPressed: controller.isBusy ? null : onCreateFolder,
+          ),
+          _TopBarButton(
+            label: 'Subir',
+            icon: Icons.cloud_upload_outlined,
+            onPressed: controller.isBusy ? null : onUpload,
+            filled: true,
+          ),
+          _TopBarButton(
+            label: 'Salir',
+            icon: Icons.logout_outlined,
+            onPressed: authController.isBusy ? null : onSignOut,
+            danger: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopBarButton extends StatelessWidget {
+  const _TopBarButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+    this.danger = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool filled;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    if (filled) {
+      return FilledButton.icon(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF0EA5E9),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        icon: Icon(icon),
+        label: Text(label),
+      );
+    }
+
+    return TextButton.icon(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: danger
+            ? const Color(0xFFB42318)
+            : const Color(0xFF0369A1),
+        backgroundColor: danger
+            ? const Color(0xFFFFEDEA)
+            : const Color(0xFFE7F8FE),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      icon: Icon(icon),
+      label: Text(label),
+    );
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.controller,
@@ -982,63 +1235,115 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = controller.folderPath;
+    final currentName = path.isEmpty ? 'Mi unidad' : path.last.name;
+    final totalItems = controller.folders.length + controller.files.length;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0066CC), Color(0xFF0057B2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF00B8D9), Color(0xFF0877D9)],
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0284C7).withValues(alpha: 0.20),
+            blurRadius: 34,
+            offset: const Offset(0, 20),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Wrap(
+        spacing: 28,
+        runSpacing: 24,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Text(
-            'Tauler',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 260, maxWidth: 560),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  child: Text(
+                    userEmail,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  currentName,
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    height: 1.02,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  path.isEmpty
+                      ? 'Tu unidad personal para guardar, ordenar y compartir.'
+                      : 'Estas navegando dentro de ${path.map((folder) => folder.name).join(' / ')}.',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Base tecnica lista para Android, Web y Desktop con carga real a Storage.',
-            style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            userEmail,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ActionChip(
-                label: const Text('Raiz'),
-                onPressed: onGoRoot,
-                backgroundColor: Colors.white,
-              ),
-              for (final folder in path)
-                ActionChip(
-                  label: Text(folder.name),
-                  onPressed: () => controller.openFolder(folder.id),
-                  backgroundColor: Colors.white,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 260, maxWidth: 460),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _DriveMetric(
+                      icon: Icons.folder_rounded,
+                      value: '${controller.folders.length}',
+                      label: 'carpetas',
+                    ),
+                    _DriveMetric(
+                      icon: Icons.insert_drive_file_outlined,
+                      value: '${controller.files.length}',
+                      label: 'archivos',
+                    ),
+                    _DriveMetric(
+                      icon: Icons.inventory_2_outlined,
+                      value: '$totalItems',
+                      label: 'elementos',
+                    ),
+                  ],
                 ),
-              if (onRefresh != null)
-                ActionChip(
-                  label: const Text('Refrescar'),
-                  onPressed: onRefresh,
-                  backgroundColor: Colors.white,
+                const SizedBox(height: 18),
+                _BreadcrumbBar(
+                  path: path,
+                  onGoRoot: onGoRoot,
+                  onOpenFolder: controller.openFolder,
+                  onRefresh: onRefresh,
                 ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1046,33 +1351,114 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _Actions extends StatelessWidget {
-  const _Actions({
-    required this.onCreateFolder,
-    required this.onCreateFile,
+class _DriveMetric extends StatelessWidget {
+  const _DriveMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
   });
 
-  final VoidCallback onCreateFolder;
-  final VoidCallback onCreateFile;
+  final IconData icon;
+  final String value;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        FilledButton.icon(
-          onPressed: onCreateFolder,
-          icon: const Icon(Icons.create_new_folder_outlined),
-          label: const Text('Crear carpeta'),
-        ),
-        FilledButton.icon(
-          onPressed: onCreateFile,
-          icon: const Icon(Icons.upload_file_outlined),
-          label: const Text('Subir archivo'),
-        ),
-      ],
+    return Container(
+      width: 132,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 22),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: const Color(0xFFCFFAFE),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BreadcrumbBar extends StatelessWidget {
+  const _BreadcrumbBar({
+    required this.path,
+    required this.onGoRoot,
+    required this.onOpenFolder,
+    required this.onRefresh,
+  });
+
+  final List<FolderItem> path;
+  final VoidCallback onGoRoot;
+  final ValueChanged<String> onOpenFolder;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ActionChip(
+            avatar: const Icon(Icons.home_rounded, size: 18),
+            label: const Text('Mi unidad'),
+            onPressed: onGoRoot,
+            backgroundColor: Colors.white,
+            labelStyle: const TextStyle(
+              color: Color(0xFF0369A1),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          for (final folder in path)
+            ActionChip(
+              avatar: const Icon(Icons.chevron_right_rounded, size: 18),
+              label: Text(folder.name),
+              onPressed: () => onOpenFolder(folder.id),
+              backgroundColor: Colors.white.withValues(alpha: 0.92),
+              labelStyle: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          if (onRefresh != null)
+            IconButton.filledTonal(
+              tooltip: 'Refrescar',
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF0369A1),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1084,55 +1470,145 @@ class _SearchAndFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: TextEditingController(text: controller.searchQuery),
-              onChanged: controller.setSearchQuery,
-              decoration: InputDecoration(
-                labelText: 'Buscar por nombre',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: controller.searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: controller.clearSearch,
-                        icon: const Icon(Icons.clear),
-                      ),
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFD6EAF5)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0284C7).withValues(alpha: 0.08),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final filters = Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                avatar: const Icon(Icons.all_inbox_rounded, size: 18),
+                label: const Text('Todos'),
+                selected: controller.fileTypeFilter == FileTypeFilter.all,
+                onSelected: (_) =>
+                    controller.setFileTypeFilter(FileTypeFilter.all),
+              ),
+              ChoiceChip(
+                avatar: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: const Text('PDF'),
+                selected: controller.fileTypeFilter == FileTypeFilter.pdf,
+                onSelected: (_) =>
+                    controller.setFileTypeFilter(FileTypeFilter.pdf),
+              ),
+              ChoiceChip(
+                avatar: const Icon(Icons.image_outlined, size: 18),
+                label: const Text('Imagenes'),
+                selected: controller.fileTypeFilter == FileTypeFilter.images,
+                onSelected: (_) =>
+                    controller.setFileTypeFilter(FileTypeFilter.images),
+              ),
+              ChoiceChip(
+                avatar: const Icon(Icons.more_horiz_rounded, size: 18),
+                label: const Text('Otros'),
+                selected: controller.fileTypeFilter == FileTypeFilter.other,
+                onSelected: (_) =>
+                    controller.setFileTypeFilter(FileTypeFilter.other),
+              ),
+            ],
+          );
+
+          final search = TextField(
+            controller: TextEditingController(text: controller.searchQuery),
+            onChanged: controller.setSearchQuery,
+            decoration: InputDecoration(
+              labelText: 'Buscar por nombre',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: controller.searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: controller.clearSearch,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              filled: true,
+              fillColor: const Color(0xFFF8FBFD),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          );
+
+          if (constraints.maxWidth >= 720) {
+            return Row(
               children: [
-                ChoiceChip(
-                  label: const Text('Todos'),
-                  selected: controller.fileTypeFilter == FileTypeFilter.all,
-                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.all),
-                ),
-                ChoiceChip(
-                  label: const Text('PDF'),
-                  selected: controller.fileTypeFilter == FileTypeFilter.pdf,
-                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.pdf),
-                ),
-                ChoiceChip(
-                  label: const Text('Imágenes'),
-                  selected: controller.fileTypeFilter == FileTypeFilter.images,
-                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.images),
-                ),
-                ChoiceChip(
-                  label: const Text('Otros'),
-                  selected: controller.fileTypeFilter == FileTypeFilter.other,
-                  onSelected: (_) => controller.setFileTypeFilter(FileTypeFilter.other),
-                ),
+                Expanded(child: search),
+                const SizedBox(width: 16),
+                filters,
               ],
-            ),
-          ],
-        ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [search, const SizedBox(height: 14), filters],
+          );
+        },
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0F8FC),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(icon, color: const Color(0xFF0EA5E9)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: const Color(0xFF0F172A),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1192,13 +1668,16 @@ class _FolderCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF172033),
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: const Color(0xFF172033),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6F8FB),
                     borderRadius: BorderRadius.circular(999),
@@ -1219,9 +1698,9 @@ class _FolderCard extends StatelessWidget {
                         isRootFolder ? 'Carpeta raiz' : 'Subcarpeta',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF5C6F8C),
-                              fontWeight: FontWeight.w600,
-                            ),
+                          color: const Color(0xFF5C6F8C),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -1264,23 +1743,56 @@ class _FolderCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.label});
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.label,
+  });
 
+  final IconData icon;
+  final String title;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withValues(alpha: 0.86),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFDCE4F0)),
+        border: Border.all(color: const Color(0xFFD6EAF5)),
       ),
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7F8FE),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, color: const Color(0xFF0EA5E9), size: 30),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: const Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1310,9 +1822,9 @@ class _Banner extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: textColor,
-              fontWeight: FontWeight.w600,
-            ),
+          color: textColor,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1353,8 +1865,8 @@ class _FileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SizedBox(
-      height: _cardHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: _cardHeight),
       child: Card(
         elevation: 0,
         color: Colors.white,
@@ -1368,6 +1880,7 @@ class _FileCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
@@ -1390,15 +1903,18 @@ class _FileCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
-                            color: const Color(0xFF172033),
-                            fontWeight: FontWeight.w800,
-                          ),
+                        color: const Color(0xFF172033),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6F8FB),
                     borderRadius: BorderRadius.circular(999),
@@ -1417,9 +1933,9 @@ class _FileCard extends StatelessWidget {
                         subtitle,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF5C6F8C),
-                              fontWeight: FontWeight.w600,
-                            ),
+                          color: const Color(0xFF5C6F8C),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -1441,7 +1957,8 @@ class _FileCard extends StatelessWidget {
 
   Widget _buildActionButton(_FileAction action) {
     final isDangerAction =
-        action.icon == Icons.delete_outline || action.icon == Icons.remove_circle_outline;
+        action.icon == Icons.delete_outline ||
+        action.icon == Icons.remove_circle_outline;
 
     return IconButton(
       tooltip: action.label,
@@ -1450,13 +1967,169 @@ class _FileCard extends StatelessWidget {
       style: IconButton.styleFrom(
         fixedSize: const Size.square(42),
         foregroundColor: isDangerAction ? const Color(0xFFB42318) : accent,
-        backgroundColor:
-            isDangerAction ? const Color(0xFFFFEDEA) : accent.withValues(alpha: 0.10),
+        backgroundColor: isDangerAction
+            ? const Color(0xFFFFEDEA)
+            : accent.withValues(alpha: 0.10),
         disabledForegroundColor: const Color(0xFF94A3B8),
         disabledBackgroundColor: const Color(0xFFF1F5F9),
-        hoverColor:
-            isDangerAction ? const Color(0xFFFFD7D1) : accent.withValues(alpha: 0.16),
+        hoverColor: isDangerAction
+            ? const Color(0xFFFFD7D1)
+            : accent.withValues(alpha: 0.16),
       ),
     );
   }
+}
+
+class _DriveLoadingState extends StatelessWidget {
+  const _DriveLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.86),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: const Color(0xFFD6EAF5)),
+        ),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 64,
+              height: 64,
+              child: CustomPaint(painter: _DroplyLogoPainter()),
+            ),
+            SizedBox(height: 18),
+            CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DroplyLogoPainter extends CustomPainter {
+  const _DroplyLogoPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final strokeWidth = size.shortestSide * 0.078;
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF00B8D9), Color(0xFF0877D9)],
+      ).createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final drop = Path()
+      ..moveTo(size.width * 0.5, size.height * 0.09)
+      ..cubicTo(
+        size.width * 0.68,
+        size.height * 0.33,
+        size.width * 0.83,
+        size.height * 0.42,
+        size.width * 0.86,
+        size.height * 0.63,
+      )
+      ..cubicTo(
+        size.width * 0.90,
+        size.height * 0.86,
+        size.width * 0.70,
+        size.height * 0.96,
+        size.width * 0.50,
+        size.height * 0.96,
+      )
+      ..cubicTo(
+        size.width * 0.30,
+        size.height * 0.96,
+        size.width * 0.10,
+        size.height * 0.86,
+        size.width * 0.14,
+        size.height * 0.63,
+      )
+      ..cubicTo(
+        size.width * 0.17,
+        size.height * 0.42,
+        size.width * 0.32,
+        size.height * 0.33,
+        size.width * 0.5,
+        size.height * 0.09,
+      );
+
+    final arrow = Path()
+      ..moveTo(size.width * 0.50, size.height * 0.31)
+      ..lineTo(size.width * 0.50, size.height * 0.73)
+      ..moveTo(size.width * 0.30, size.height * 0.58)
+      ..lineTo(size.width * 0.50, size.height * 0.78)
+      ..lineTo(size.width * 0.70, size.height * 0.58);
+
+    final arrowHead = Path()
+      ..moveTo(size.width * 0.50, size.height * 0.31)
+      ..lineTo(size.width * 0.59, size.height * 0.43)
+      ..lineTo(size.width * 0.59, size.height * 0.62)
+      ..moveTo(size.width * 0.50, size.height * 0.31)
+      ..lineTo(size.width * 0.41, size.height * 0.43)
+      ..lineTo(size.width * 0.41, size.height * 0.62);
+
+    canvas.drawPath(drop, paint);
+    canvas.drawPath(arrow, paint);
+    canvas.drawPath(arrowHead, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _DriveBackgroundPainter extends CustomPainter {
+  const _DriveBackgroundPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final wavePaint = Paint()
+      ..color = const Color(0xFF0EA5E9).withValues(alpha: 0.08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    for (var i = 0; i < 5; i++) {
+      final y = size.height * (0.14 + i * 0.16);
+      final path = Path()..moveTo(-40, y);
+      for (var x = -40.0; x <= size.width + 40; x += 34) {
+        path.lineTo(x, y + math.sin((x / 86) + i) * (10 + i));
+      }
+      canvas.drawPath(path, wavePaint);
+    }
+
+    final bottomPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.bottomLeft,
+        end: Alignment.topRight,
+        colors: [Color(0x3322D3EE), Color(0x0014B8A6)],
+      ).createShader(Offset.zero & size);
+
+    final bottom = Path()
+      ..moveTo(0, size.height)
+      ..lineTo(0, size.height * 0.76)
+      ..cubicTo(
+        size.width * 0.25,
+        size.height * 0.62,
+        size.width * 0.62,
+        size.height * 0.96,
+        size.width,
+        size.height * 0.70,
+      )
+      ..lineTo(size.width, size.height)
+      ..close();
+
+    canvas.drawPath(bottom, bottomPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

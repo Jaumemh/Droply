@@ -89,13 +89,18 @@ class ShareRepository {
     );
 
     final map = _firstRow(response);
-    await logEvent(
-      action: 'SHARE_CREATE',
-      fileId: fileId,
-      shareId: map['id'] as String,
-      userAgent: 'flutter',
-      ipClient: null,
-    );
+    try {
+      await logEvent(
+        action: 'SHARE_CREATE',
+        fileId: fileId,
+        shareId: map['id'] as String,
+        userAgent: 'flutter',
+        ipClient: null,
+      );
+    } on Object {
+      // El enlace ya esta creado; un fallo de auditoria no debe bloquearlo.
+    }
+
     return ShareLinkResult(
       shareId: map['id'] as String,
       token: map['token'] as String,

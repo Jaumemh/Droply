@@ -3,6 +3,7 @@ import 'package:droply/features/auth/auth_status.dart';
 import 'package:droply/features/auth/presentation/otp_login_page.dart';
 import 'package:droply/features/dashboard/presentation/authenticated_home_page.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:droply/features/onboarding/presentation/droply_intro_page.dart';
 import 'package:flutter/material.dart';
 
 class AuthGate extends StatefulWidget {
@@ -20,6 +21,8 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  bool _introCompleted = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,11 +37,22 @@ class _AuthGateState extends State<AuthGate> {
         switch (widget.controller.status) {
           case AuthStatus.unknown:
             return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
+              body: Center(child: CircularProgressIndicator()),
             );
           case AuthStatus.unauthenticated:
+            if (!_introCompleted) {
+              return DroplyIntroPage(
+                onFinished: () {
+                  if (!mounted) {
+                    return;
+                  }
+                  setState(() {
+                    _introCompleted = true;
+                  });
+                },
+              );
+            }
+            return OtpLoginPage(controller: widget.controller);
           case AuthStatus.otpSent:
             return OtpLoginPage(controller: widget.controller);
           case AuthStatus.authenticated:

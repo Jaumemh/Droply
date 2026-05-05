@@ -267,10 +267,11 @@ class DashboardController extends ChangeNotifier {
         .map((folder) => _sanitizePathSegment(folder.name))
         .toList();
     final safeFileName = _sanitizePathSegment(fileName);
+    final uniqueFileName = '${DateTime.now().microsecondsSinceEpoch}-$safeFileName';
     if (folderSegments.isEmpty) {
-      return '$userId/root/$safeFileName';
+      return '$userId/root/$uniqueFileName';
     }
-    return '$userId/${folderSegments.join('/')}/$safeFileName';
+    return '$userId/${folderSegments.join('/')}/$uniqueFileName';
   }
 
   String _formatUploadMessage(UploadProgress progress) {
@@ -360,7 +361,14 @@ class DashboardController extends ChangeNotifier {
         file.name.toLowerCase().endsWith('.jpeg') ||
         file.name.toLowerCase().endsWith('.png') ||
         file.name.toLowerCase().endsWith('.gif') ||
-        file.name.toLowerCase().endsWith('.webp');
+        file.name.toLowerCase().endsWith('.webp') ||
+        file.name.toLowerCase().endsWith('.svg') ||
+        file.name.toLowerCase().endsWith('.heic') ||
+        file.name.toLowerCase().endsWith('.heif') ||
+        file.name.toLowerCase().endsWith('.avif') ||
+        file.name.toLowerCase().endsWith('.bmp') ||
+        file.name.toLowerCase().endsWith('.tif') ||
+        file.name.toLowerCase().endsWith('.tiff');
   }
 }
 
