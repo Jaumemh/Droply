@@ -2839,30 +2839,6 @@ class _SharedFolderContextCard extends StatelessWidget {
               ),
             ],
           ),
-          if (members.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              'Miembros',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: members.map((member) {
-                final email = member['email'] as String? ?? 'usuario';
-                final permission = member['permission'] as String? ?? 'view';
-                return Chip(
-                  label: Text('$email · $permission'),
-                  avatar: const Icon(Icons.person_outline, size: 18),
-                );
-              }).toList(),
-            ),
-          ],
         ],
       ),
     );
