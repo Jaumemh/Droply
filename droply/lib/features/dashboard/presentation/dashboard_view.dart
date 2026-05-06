@@ -146,6 +146,9 @@ class _DashboardViewState extends State<DashboardView> {
       builder: (context, _) {
         final controller = widget.controller;
         final theme = Theme.of(context);
+        // Carpetas que ya están en la sección "Compartidas" (excluirlas de "Carpetas")
+        final sharedFolderIds = (_sharedFolders ?? []).map((s) => s.folderId).toSet();
+        final unsharedFolders = controller.folders.where((f) => !sharedFolderIds.contains(f.id)).toList();
 
         return Scaffold(
           body: DecoratedBox(
@@ -229,10 +232,10 @@ class _DashboardViewState extends State<DashboardView> {
                               icon: Icons.folder_rounded,
                               title: 'Carpetas',
                               subtitle:
-                                  '${controller.folders.length} en este nivel',
+                                  '${unsharedFolders.length} en este nivel',
                             ),
                             const SizedBox(height: 12),
-                            if (controller.folders.isEmpty)
+                            if (unsharedFolders.isEmpty)
                               const _EmptyState(
                                 icon: Icons.create_new_folder_outlined,
                                 title: 'No hay carpetas en este nivel',
@@ -244,7 +247,7 @@ class _DashboardViewState extends State<DashboardView> {
                                 alignment: WrapAlignment.start,
                                 spacing: 16,
                                 runSpacing: 16,
-                                children: controller.folders
+                                children: unsharedFolders
                                     .map(
                                       (folder) => _FolderCard(
                                         folder: folder,
@@ -416,6 +419,40 @@ class _DashboardViewState extends State<DashboardView> {
                                                     share.folderId ==
                                                         _highlightedSharedFolderId,
                                                 onOpen: () => controller.openFolder(share.folderId),
+                                                onRename: () => _showRenameFolderDialog(
+                                                  context,
+                                                  controller,
+                                                  FolderItem(
+                                                    id: share.folderId,
+                                                    name: share.folderName ?? '',
+                                                    parentId: null,
+                                                    ownerId: share.ownerId,
+                                                    createdAt: share.createdAt,
+                                                  ),
+                                                ),
+                                                onDelete: () async {
+                                                  final confirmed = await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (ctx) => AlertDialog(
+                                                      title: const Text('Eliminar carpeta compartida'),
+                                                      content: Text('¿Eliminar "${share.folderName ?? 'esta carpeta'}"? Esta acción no se puede deshacer.'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () => Navigator.pop(ctx, false),
+                                                          child: const Text('Cancelar'),
+                                                        ),
+                                                        FilledButton(
+                                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                                          onPressed: () => Navigator.pop(ctx, true),
+                                                          child: const Text('Eliminar'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                  if (confirmed == true) {
+                                                    await controller.deleteFolder(share.folderId);
+                                                  }
+                                                },
                                               ),
                                             ),
                                           )
@@ -2775,11 +2812,15 @@ class _SharedFolderHoverCard extends StatefulWidget {
     required this.share,
     required this.isHighlighted,
     required this.onOpen,
+    this.onRename,
+    this.onDelete,
   });
 
   final FolderShare share;
   final bool isHighlighted;
   final VoidCallback onOpen;
+  final VoidCallback? onRename;
+  final VoidCallback? onDelete;
 
   @override
   State<_SharedFolderHoverCard> createState() => _SharedFolderHoverCardState();
@@ -3043,35 +3084,75 @@ class _SharedFolderHoverCardState extends State<_SharedFolderHoverCard> {
                       ),
                     ],
                     const SizedBox(height: 18),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _isHovered
-                            ? accent
-                            : accent.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.folder_open_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Abrir carpeta',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _isHovered
+                                  ? accent
+                                  : accent.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.folder_open_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Abrir carpeta',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                        ),
+                        if (widget.onRename != null || widget.onDelete != null) ...[  
+                          const SizedBox(width: 8),
+                          PopupMenuButton<String>(
+                            icon: Icon(Icons.more_vert_rounded, color: accent),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            onSelected: (value) {
+                              if (value == 'rename') widget.onRename?.call();
+                              if (value == 'delete') widget.onDelete?.call();
+                            },
+                            itemBuilder: (_) => [
+                              if (widget.onRename != null)
+                                const PopupMenuItem(
+                                  value: 'rename',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_outlined, size: 18),
+                                      SizedBox(width: 10),
+                                      Text('Renombrar'),
+                                    ],
+                                  ),
+                                ),
+                              if (widget.onDelete != null)
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                      SizedBox(width: 10),
+                                      Text('Eliminar', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                   ],
                 ),
