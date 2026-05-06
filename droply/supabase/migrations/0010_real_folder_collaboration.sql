@@ -132,6 +132,133 @@ begin
 end;
 $$;
 
+drop function if exists public.get_shared_folders_for_user(uuid);
+create or replace function public.get_shared_folders_for_user(
+  p_user_id uuid
+)
+returns table (
+  folder_id uuid,
+  folder_name text,
+  owner_id uuid,
+  owner_email text,
+  shared_with_user_id uuid,
+  permission text,
+  inherit_to_subfolders boolean,
+  shared_at timestamptz,
+  file_count bigint,
+  member_count bigint,
+  members jsonb
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  with shared_roots as (
+    select
+      f.id as folder_id,
+      f.name as folder_name,
+      f.owner_id,
+      owner_user.email as owner_email,
+      p_user_id as shared_with_user_id,
+      'full'::text as permission,
+      true as inherit_to_subfolders,
+      min(coalesce(fs.accepted_at, fs.created_at, f.created_at)) as shared_at,
+      0 as role_sort
+    from public.folders f
+    join public.folder_shares fs on fs.folder_id = f.id
+    left join public.users owner_user on owner_user.id = f.owner_id
+    where f.owner_id = p_user_id
+    group by f.id, f.name, f.owner_id, owner_user.email
+
+    union all
+
+    select
+      f.id as folder_id,
+      f.name as folder_name,
+      f.owner_id,
+      owner_user.email as owner_email,
+      fs.shared_with_user_id,
+      fs.permission::text as permission,
+      fs.inherit_to_subfolders,
+      coalesce(fs.accepted_at, fs.created_at) as shared_at,
+      1 as role_sort
+    from public.folder_shares fs
+    join public.folders f on f.id = fs.folder_id
+    left join public.users owner_user on owner_user.id = f.owner_id
+    where fs.shared_with_user_id = p_user_id
+  ),
+  deduped as (
+    select distinct on (sr.folder_id)
+      sr.folder_id,
+      sr.folder_name,
+      sr.owner_id,
+      coalesce(sr.owner_email, 'Usuario') as owner_email,
+      sr.shared_with_user_id,
+      sr.permission,
+      sr.inherit_to_subfolders,
+      sr.shared_at
+    from shared_roots sr
+    order by sr.folder_id, sr.role_sort, sr.shared_at desc
+  )
+  select
+    d.folder_id,
+    d.folder_name,
+    d.owner_id,
+    d.owner_email,
+    d.shared_with_user_id,
+    d.permission,
+    d.inherit_to_subfolders,
+    d.shared_at,
+    coalesce(file_counts.file_count, 0)::bigint as file_count,
+    coalesce(member_rows.member_count, 0)::bigint as member_count,
+    coalesce(member_rows.members, '[]'::jsonb) as members
+  from deduped d
+  left join lateral (
+    select count(*)::bigint as file_count
+    from public.files fi
+    where fi.folder_id = d.folder_id
+      and fi.is_deleted = false
+  ) file_counts on true
+  left join lateral (
+    select
+      count(*)::bigint as member_count,
+      jsonb_agg(
+        jsonb_build_object(
+          'user_id', m.user_id,
+          'email', m.email,
+          'permission', m.permission,
+          'accepted_at', m.accepted_at,
+          'role', m.role
+        )
+        order by m.sort_order, m.email
+      ) as members
+    from (
+      select
+        d.owner_id as user_id,
+        d.owner_email as email,
+        'full'::text as permission,
+        null::timestamptz as accepted_at,
+        'owner'::text as role,
+        0 as sort_order
+      union all
+      select
+        fs2.shared_with_user_id as user_id,
+        coalesce(shared_user.email, 'Usuario') as email,
+        fs2.permission::text as permission,
+        fs2.accepted_at,
+        'member'::text as role,
+        1 as sort_order
+      from public.folder_shares fs2
+      left join public.users shared_user on shared_user.id = fs2.shared_with_user_id
+      where fs2.folder_id = d.folder_id
+    ) m
+  ) member_rows on true
+  order by d.shared_at desc nulls last, d.folder_name asc;
+end;
+$$;
+
 drop function if exists public.get_folder_browser_snapshot(uuid, uuid);
 create or replace function public.get_folder_browser_snapshot(
   p_user_id uuid,
@@ -607,6 +734,7 @@ using (
 grant execute on function public.user_has_folder_access(uuid, uuid) to authenticated;
 grant execute on function public.folder_permission_rank(text) to authenticated;
 grant execute on function public.require_folder_permission(uuid, uuid, text) to authenticated;
+grant execute on function public.get_shared_folders_for_user(uuid) to authenticated;
 grant execute on function public.get_folder_browser_snapshot(uuid, uuid) to authenticated;
 grant execute on function public.create_collaborative_folder(uuid, uuid, text) to authenticated;
 grant execute on function public.rename_collaborative_folder(uuid, uuid, text) to authenticated;

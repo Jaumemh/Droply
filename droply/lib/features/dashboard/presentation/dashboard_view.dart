@@ -1007,6 +1007,10 @@ class _DashboardViewState extends State<DashboardView> {
                         : const Color(0xFFEF4444),
                   ),
                 );
+
+                if (sendError == null) {
+                  await _loadSharedFolders();
+                }
               },
               icon: const Icon(Icons.send_outlined),
               label: const Text(
@@ -2699,7 +2703,7 @@ class _SharedFolderMembersBar extends StatelessWidget {
                 ),
               ),
               Text(
-                '${members.length} usuarios',
+                '${members.isEmpty ? 1 : members.length} usuarios',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: Colors.white.withValues(alpha: 0.85),
                   fontWeight: FontWeight.w700,
@@ -2712,6 +2716,7 @@ class _SharedFolderMembersBar extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (members.isEmpty)
               _MiniMemberChip(
                 label: '${share.ownerEmail ?? 'Propietario'} · dueño',
                 icon: Icons.person,
@@ -2921,6 +2926,19 @@ class _SharedFolderCard extends StatelessWidget {
     }
   }
 
+  IconData _getPermissionMaterialIcon(FolderPermission permission) {
+    switch (permission) {
+      case FolderPermission.view:
+        return Icons.visibility_outlined;
+      case FolderPermission.download:
+        return Icons.download_outlined;
+      case FolderPermission.upload:
+        return Icons.cloud_upload_outlined;
+      case FolderPermission.full:
+        return Icons.admin_panel_settings_outlined;
+    }
+  }
+
   Color _getPermissionColor(FolderPermission permission) {
     switch (permission) {
       case FolderPermission.view:
@@ -3032,9 +3050,10 @@ class _SharedFolderCard extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _getPermissionIcon(share.permission),
-                  style: const TextStyle(fontSize: 14),
+                Icon(
+                  _getPermissionMaterialIcon(share.permission),
+                  size: 15,
+                  color: _getPermissionColor(share.permission),
                 ),
                 const SizedBox(width: 6),
                 Flexible(
