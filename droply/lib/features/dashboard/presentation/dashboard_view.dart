@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:droply/features/dashboard/data/file_browser_repository.dart';
+import 'package:droply/features/dashboard/data/folder_sharing_repository.dart';
 import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:file_picker/file_picker.dart';
@@ -28,10 +29,36 @@ class DashboardView extends StatefulWidget {
 }
 
 class _DashboardViewState extends State<DashboardView> {
+  List<FolderShare>? _sharedFolders;
+  bool _loadingSharedFolders = true;
+  bool _isSendingInvitation = false;
+
   @override
   void initState() {
     super.initState();
     widget.controller.initialize();
+    _loadSharedFolders();
+  }
+
+  Future<void> _loadSharedFolders() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final repository = FolderSharingRepository(supabase);
+      final folders = await repository.getSharedFolders();
+      if (mounted) {
+        setState(() {
+          _sharedFolders = folders;
+          _loadingSharedFolders = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _sharedFolders = [];
+          _loadingSharedFolders = false;
+        });
+      }
+    }
   }
 
   @override
@@ -116,6 +143,31 @@ class _DashboardViewState extends State<DashboardView> {
                             ],
                             _SearchAndFilterBar(controller: controller),
                             const SizedBox(height: 20),
+                            
+                            // Sección de carpetas compartidas
+                            if (!_loadingSharedFolders && _sharedFolders != null && _sharedFolders!.isNotEmpty) ...[
+                              _SectionHeader(
+                                icon: Icons.folder_shared_rounded,
+                                title: 'Carpetas compartidas conmigo',
+                                subtitle: '${_sharedFolders!.length} carpeta${_sharedFolders!.length != 1 ? 's' : ''}',
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                alignment: WrapAlignment.start,
+                                spacing: 16,
+                                runSpacing: 16,
+                                children: _sharedFolders!
+                                    .map(
+                                      (share) => _SharedFolderCard(
+                                        share: share,
+                                        onOpen: () => controller.openFolder(share.folderId),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            
                             _SectionHeader(
                               icon: Icons.folder_rounded,
                               title: 'Carpetas',
@@ -148,6 +200,10 @@ class _DashboardViewState extends State<DashboardView> {
                                         ),
                                         onDelete: () =>
                                             controller.deleteFolder(folder.id),
+                                        onShare: () => _shareFolderDialog(
+                                          context,
+                                          folder,
+                                        ),
                                       ),
                                     )
                                     .toList(),
@@ -652,6 +708,316 @@ class _DashboardViewState extends State<DashboardView> {
         ],
       ),
     );
+  }
+
+  Future<void> _shareFolderDialog(
+    BuildContext context,
+    FolderItem folder,
+  ) async {
+    final emailController = TextEditingController();
+    final messageController = TextEditingController();
+    String selectedPermission = 'download';
+    bool inheritToSubfolders = true;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.folder_shared_outlined,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Compartir carpeta',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      folder.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 450,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Email del destinatario',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      hintText: 'ejemplo@correo.com',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Permisos de acceso',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...['view', 'download', 'upload', 'full'].map((perm) {
+                    final permissionLabels = {
+                      'view': ('Solo ver', Icons.visibility_outlined),
+                      'download': ('Ver y descargar', Icons.download_outlined),
+                      'upload': ('Ver, descargar y subir', Icons.upload_outlined),
+                      'full': ('Control total', Icons.admin_panel_settings_outlined),
+                    };
+                    final label = permissionLabels[perm]!;
+                    
+                    return RadioListTile<String>(
+                      value: perm,
+                      groupValue: selectedPermission,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedPermission = value!;
+                        });
+                      },
+                      title: Row(
+                        children: [
+                          Icon(label.$2, size: 20, color: const Color(0xFF10B981)),
+                          const SizedBox(width: 8),
+                          Text(
+                            label.$1,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      activeColor: const Color(0xFF10B981),
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    value: inheritToSubfolders,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        inheritToSubfolders = value ?? true;
+                      });
+                    },
+                    title: const Text(
+                      'Aplicar a subcarpetas',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Los permisos se heredarán a todas las subcarpetas',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    activeColor: const Color(0xFF10B981),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Mensaje opcional',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: messageController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: 'Agrega un mensaje personalizado...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                final email = emailController.text.trim();
+                if (email.isEmpty || !email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Por favor ingresa un email válido'),
+                      backgroundColor: Color(0xFFEF4444),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.of(context).pop();
+                if (!mounted) return;
+
+                setState(() {
+                  _isSendingInvitation = true;
+                });
+
+                Object? sendError;
+                try {
+                  await _sendFolderInvitation(
+                    folder.id,
+                    email,
+                    selectedPermission,
+                    inheritToSubfolders,
+                    messageController.text.trim().isEmpty
+                        ? null
+                        : messageController.text.trim(),
+                  );
+                } catch (e) {
+                  sendError = e;
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      _isSendingInvitation = false;
+                    });
+                  }
+                }
+
+                if (!mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      sendError == null
+                          ? 'Invitacion enviada a $email'
+                          : 'Error: $sendError',
+                    ),
+                    backgroundColor: sendError == null
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFEF4444),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.send_outlined),
+              label: const Text(
+                'Enviar invitación',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendFolderInvitation(
+    String folderId,
+    String email,
+    String permission,
+    bool inheritToSubfolders,
+    String? message,
+  ) async {
+    final supabase = Supabase.instance.client;
+    final repository = FolderSharingRepository(supabase);
+
+    // Convertir string a enum
+    final folderPermission = FolderPermission.fromString(permission);
+
+    // Crear la invitación en la base de datos
+    final result = await repository.createInvitation(
+      folderId: folderId,
+      inviteeEmail: email,
+      permission: folderPermission,
+      inheritToSubfolders: inheritToSubfolders,
+      message: message,
+      daysValid: 7,
+    );
+
+    // Construir el enlace de invitación
+    final baseUrl = Uri.base.origin;
+    final invitationLink = '$baseUrl/#/accept-folder-invitation?token=${result.token}';
+
+    // Enviar el email usando Edge Function
+    final response = await supabase.functions.invoke(
+      'send-folder-invitation',
+      body: {
+        'to': email,
+        'invitationLink': invitationLink,
+        'folderName': widget.controller.folders
+            .firstWhere((f) => f.id == folderId)
+            .name,
+        'senderEmail': widget.userEmail,
+        'message': message,
+        'permission': folderPermission.displayName,
+        'expiresAt': result.expiresAt.toIso8601String(),
+      },
+    );
+
+    // Verificar respuesta
+    if (response.status != 200) {
+      final error = response.data is Map ? response.data['error'] ?? 'Unknown error' : 'Failed to send email';
+      throw Exception(error);
+    }
   }
 
   Future<void> _showMoveFileDialog(
@@ -2223,18 +2589,199 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+class _SharedFolderCard extends StatelessWidget {
+  const _SharedFolderCard({
+    required this.share,
+    required this.onOpen,
+  });
+
+  final FolderShare share;
+  final VoidCallback onOpen;
+
+  String _getPermissionIcon(FolderPermission permission) {
+    switch (permission) {
+      case FolderPermission.view:
+        return '👁️';
+      case FolderPermission.download:
+        return '📥';
+      case FolderPermission.upload:
+        return '📤';
+      case FolderPermission.full:
+        return '🔑';
+    }
+  }
+
+  Color _getPermissionColor(FolderPermission permission) {
+    switch (permission) {
+      case FolderPermission.view:
+        return const Color(0xFF6B7280);
+      case FolderPermission.download:
+        return const Color(0xFF0EA5E9);
+      case FolderPermission.upload:
+        return const Color(0xFF8B5CF6);
+      case FolderPermission.full:
+        return const Color(0xFF10B981);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            _getPermissionColor(share.permission).withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _getPermissionColor(share.permission).withOpacity(0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _getPermissionColor(share.permission).withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _getPermissionColor(share.permission).withOpacity(0.2),
+                      _getPermissionColor(share.permission).withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.folder_shared_rounded,
+                  size: 28,
+                  color: _getPermissionColor(share.permission),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      share.folderName ?? 'Carpeta compartida',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Por ${share.ownerEmail ?? 'usuario'}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _getPermissionColor(share.permission).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _getPermissionColor(share.permission).withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _getPermissionIcon(share.permission),
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    share.permission.displayName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _getPermissionColor(share.permission),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onOpen,
+              icon: const Icon(Icons.folder_open, size: 18),
+              label: const Text(
+                'Abrir carpeta',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _getPermissionColor(share.permission),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FolderCard extends StatefulWidget {
   const _FolderCard({
     required this.folder,
     required this.onOpen,
     required this.onRename,
     required this.onDelete,
+    required this.onShare,
   });
 
   final FolderItem folder;
   final VoidCallback onOpen;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final VoidCallback onShare;
 
   @override
   State<_FolderCard> createState() => _FolderCardState();
@@ -2417,14 +2964,21 @@ class _FolderCardState extends State<_FolderCard> {
                             onPressed: widget.onOpen,
                             color: const Color(0xFF0EA5E9),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 8),
+                          _buildActionButton(
+                            tooltip: 'Compartir',
+                            icon: Icons.person_add_outlined,
+                            onPressed: widget.onShare,
+                            color: const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 8),
                           _buildActionButton(
                             tooltip: 'Renombrar',
                             icon: Icons.edit_outlined,
                             onPressed: widget.onRename,
                             color: const Color(0xFF8B5CF6),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 8),
                           _buildActionButton(
                             tooltip: 'Eliminar',
                             icon: Icons.delete_outline,

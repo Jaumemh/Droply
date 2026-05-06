@@ -4,6 +4,7 @@ import 'package:droply/features/auth/presentation/auth_gate.dart';
 import 'package:droply/features/auth/supabase_auth_repository.dart';
 import 'package:droply/features/auth/unsupported_auth_repository.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:droply/features/dashboard/presentation/accept_folder_invitation_page.dart';
 import 'package:droply/features/sharing/presentation/share_viewer_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -90,6 +91,11 @@ class _DroplyAppState extends State<DroplyApp> {
       return ShareViewerPage(token: token);
     }
 
+    final invitationToken = _folderInvitationTokenFromUri(Uri.base);
+    if (invitationToken != null) {
+      return AcceptFolderInvitationPage(token: invitationToken);
+    }
+
     return AuthGate(
       controller: _controller,
       dashboardController: _dashboardController,
@@ -119,6 +125,41 @@ class _DroplyAppState extends State<DroplyApp> {
     }
 
     return segments.length > 1 ? segments[1] : '';
+  }
+
+  String? _folderInvitationTokenFromUri(Uri uri) {
+    // Primero intentar desde el path
+    final pathToken = _folderInvitationTokenFromSegments(uri.pathSegments);
+    if (pathToken != null) {
+      return pathToken;
+    }
+
+    // Intentar desde el fragment
+    if (uri.fragment.isEmpty) {
+      return null;
+    }
+
+    final fragmentPath = uri.fragment.startsWith('/')
+        ? uri.fragment
+        : '/${uri.fragment}';
+    final fragmentUri = Uri.parse(fragmentPath);
+    
+    // Intentar desde segments del fragment
+    final fragmentToken = _folderInvitationTokenFromSegments(fragmentUri.pathSegments);
+    if (fragmentToken != null) {
+      return fragmentToken;
+    }
+
+    // Intentar desde query parameters del fragment
+    return fragmentUri.queryParameters['token'];
+  }
+
+  String? _folderInvitationTokenFromSegments(List<String> segments) {
+    if (segments.isEmpty || segments.first != 'accept-folder-invitation') {
+      return null;
+    }
+
+    return segments.length > 1 ? segments[1] : null;
   }
 
   AuthController _createDefaultController() {

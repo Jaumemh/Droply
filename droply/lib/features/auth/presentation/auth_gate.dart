@@ -3,8 +3,10 @@ import 'package:droply/features/auth/auth_status.dart';
 import 'package:droply/features/auth/presentation/otp_login_page.dart';
 import 'package:droply/features/dashboard/presentation/authenticated_home_page.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:droply/features/dashboard/presentation/accept_folder_invitation_page.dart';
 import 'package:droply/features/onboarding/presentation/droply_intro_page.dart';
 import 'package:flutter/material.dart';
+import 'dart:html' as html;
 
 class AuthGate extends StatefulWidget {
   const AuthGate({
@@ -56,6 +58,13 @@ class _AuthGateState extends State<AuthGate> {
           case AuthStatus.otpSent:
             return OtpLoginPage(controller: widget.controller);
           case AuthStatus.authenticated:
+            final pendingInvitationToken =
+                html.window.sessionStorage['droply_pending_invitation_token'];
+            if (pendingInvitationToken != null &&
+                pendingInvitationToken.isNotEmpty) {
+              html.window.sessionStorage.remove('droply_pending_invitation_token');
+              return AcceptFolderInvitationPage(token: pendingInvitationToken);
+            }
             return AuthenticatedHomePage(
               controller: widget.controller,
               dashboardController: widget.dashboardController,
