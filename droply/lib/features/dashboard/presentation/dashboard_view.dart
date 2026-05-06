@@ -2895,7 +2895,7 @@ class _SharedFolderHoverCardState extends State<_SharedFolderHoverCard> {
               child: Padding(
                 padding: const EdgeInsets.all(22),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Row(
                       children: [
@@ -2945,10 +2945,11 @@ class _SharedFolderHoverCardState extends State<_SharedFolderHoverCard> {
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
                                 share.folderName ?? 'Carpeta compartida',
+                                textAlign: TextAlign.center,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -2974,7 +2975,8 @@ class _SharedFolderHoverCardState extends State<_SharedFolderHoverCard> {
                       ],
                     ),
                     const SizedBox(height: 18),
-                    Container(
+                    Center(
+                    child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 8,
@@ -3006,6 +3008,7 @@ class _SharedFolderHoverCardState extends State<_SharedFolderHoverCard> {
                           ),
                         ],
                       ),
+                    ),
                     ),
                     if (widget.isHighlighted) ...[
                       const SizedBox(height: 12),
