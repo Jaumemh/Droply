@@ -224,12 +224,7 @@ class _DashboardViewState extends State<DashboardView> {
                             ],
                             _SearchAndFilterBar(controller: controller),
                             const SizedBox(height: 20),
-                            if (_currentSharedFolder != null) ...[
-                              _SharedFolderContextCard(
-                                share: _currentSharedFolder!,
-                              ),
-                              const SizedBox(height: 16),
-                            ],
+
                             _SectionHeader(
                               icon: Icons.folder_rounded,
                               title: 'Carpetas',
@@ -2767,112 +2762,6 @@ class _MiniMemberChip extends StatelessWidget {
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SharedFolderContextCard extends StatelessWidget {
-  const _SharedFolderContextCard({
-    required this.share,
-  });
-
-  final FolderShare share;
-
-  @override
-  Widget build(BuildContext context) {
-    final members = share.members ?? const [];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD7E2F2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.folder_shared_rounded, color: Color(0xFF0EA5E9)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  share.folderName ?? 'Carpeta compartida',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Compartida por ${share.ownerEmail ?? 'usuario'} · ${share.permission.displayName}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _SmallInfoChip(
-                icon: Icons.group_outlined,
-                label: '${share.memberCount ?? members.length} miembros',
-              ),
-              _SmallInfoChip(
-                icon: Icons.security_outlined,
-                label: 'Acceso compartido',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SmallInfoChip extends StatelessWidget {
-  const _SmallInfoChip({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: const Color(0xFF0F172A)),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
             ),
           ),
         ],
