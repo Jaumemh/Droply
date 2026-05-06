@@ -1,9 +1,4 @@
-import 'package:droply/features/auth/auth_controller.dart';
-import 'package:droply/features/auth/supabase_auth_repository.dart';
-import 'package:droply/features/dashboard/data/file_browser_repository.dart';
 import 'package:droply/features/dashboard/data/folder_sharing_repository.dart';
-import 'package:droply/features/dashboard/presentation/authenticated_home_page.dart';
-import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -98,21 +93,11 @@ class _AcceptFolderInvitationPageState extends State<AcceptFolderInvitationPage>
     setState(() => _isAccepting = true);
 
     try {
-      await _repository.acceptInvitation(token: widget.token);
+      final result = await _repository.acceptInvitation(token: widget.token);
+      html.window.sessionStorage.remove('droply_pending_invitation_token');
+      html.window.sessionStorage['droply_accepted_folder_id'] = result.folderId;
       if (!mounted) return;
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => AuthenticatedHomePage(
-            controller: AuthController(
-              repository: SupabaseAuthRepository(_supabase),
-            ),
-            dashboardController: DashboardController(
-              repository: FileBrowserRepository(_supabase),
-            ),
-          ),
-        ),
-      );
+      html.window.location.assign(Uri.base.origin);
     } catch (e) {
       if (!mounted) return;
       setState(() {

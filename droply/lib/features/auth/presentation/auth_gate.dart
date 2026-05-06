@@ -36,12 +36,20 @@ class _AuthGateState extends State<AuthGate> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final pendingInvitationToken =
+            html.window.sessionStorage['droply_pending_invitation_token'];
+        final hasPendingInvitation =
+            pendingInvitationToken != null && pendingInvitationToken.isNotEmpty;
+
         switch (widget.controller.status) {
           case AuthStatus.unknown:
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           case AuthStatus.unauthenticated:
+            if (hasPendingInvitation) {
+              return OtpLoginPage(controller: widget.controller);
+            }
             if (!_introCompleted) {
               return DroplyIntroPage(
                 onFinished: () {
@@ -58,12 +66,8 @@ class _AuthGateState extends State<AuthGate> {
           case AuthStatus.otpSent:
             return OtpLoginPage(controller: widget.controller);
           case AuthStatus.authenticated:
-            final pendingInvitationToken =
-                html.window.sessionStorage['droply_pending_invitation_token'];
-            if (pendingInvitationToken != null &&
-                pendingInvitationToken.isNotEmpty) {
-              html.window.sessionStorage.remove('droply_pending_invitation_token');
-              return AcceptFolderInvitationPage(token: pendingInvitationToken);
+            if (hasPendingInvitation) {
+              return AcceptFolderInvitationPage(token: pendingInvitationToken!);
             }
             return AuthenticatedHomePage(
               controller: widget.controller,

@@ -55,6 +55,7 @@ class DashboardController extends ChangeNotifier {
   List<FolderItem> get folders => _folders;
   List<FileItem> get files => _filterFiles(_files);
   List<FileItem> get sharedFiles => _filterFiles(_sharedFiles);
+  String get currentUserId => _repository.currentUserId;
 
   Future<void> initialize() async {
     await refresh();

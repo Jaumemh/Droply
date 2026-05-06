@@ -196,7 +196,7 @@ begin
     v_invitation.inherit_to_subfolders,
     timezone('utc', now())
   )
-  on conflict (folder_id, shared_with_user_id) do update
+  on conflict on constraint folder_shares_unique_user_folder do update
   set
     permission = excluded.permission,
     inherit_to_subfolders = excluded.inherit_to_subfolders,
@@ -261,6 +261,7 @@ end;
 $$;
 
 -- 8. Función para obtener carpetas compartidas con un usuario
+drop function if exists public.get_shared_folders_for_user(uuid);
 create or replace function public.get_shared_folders_for_user(
   p_user_id uuid
 )
@@ -271,28 +272,214 @@ returns table (
   owner_email text,
   permission text,
   shared_at timestamptz,
-  file_count bigint
+  file_count bigint,
+  member_count bigint,
+  members jsonb
 )
 language plpgsql
 security definer
+set search_path = public
 as $$
 begin
   return query
+  with accessible_folders as (
+    select
+      f.id as folder_id,
+      f.name as folder_name,
+      f.owner_id,
+      owner.email as owner_email,
+      'owner'::text as access_role,
+      'full'::text as permission,
+      min(coalesce(fs.created_at, f.created_at)) as shared_at
+    from public.folders f
+    left join public.users owner on owner.id = f.owner_id
+    left join public.folder_shares fs on fs.folder_id = f.id
+    where f.owner_id = p_user_id
+      and exists (
+        select 1
+        from public.folder_shares fsx
+        where fsx.folder_id = f.id
+      )
+    group by f.id, f.name, f.owner_id, owner.email
+
+    union
+
+    select
+      f.id as folder_id,
+      f.name as folder_name,
+      f.owner_id,
+      owner.email as owner_email,
+      'member'::text as access_role,
+      max(fs.permission)::text as permission,
+      min(fs.created_at) as shared_at
+    from public.folder_shares fs
+    inner join public.folders f on f.id = fs.folder_id
+    left join public.users owner on owner.id = f.owner_id
+    where fs.shared_with_user_id = p_user_id
+    group by f.id, f.name, f.owner_id, owner.email
+  ),
+  folder_rows as (
+    select distinct on (folder_id)
+      folder_id,
+      folder_name,
+      owner_id,
+      owner_email,
+      permission,
+      shared_at
+    from accessible_folders
+    order by folder_id, case access_role when 'owner' then 0 else 1 end, shared_at desc
+  )
   select
-    f.id,
-    f.name,
-    f.owner_id,
-    u.email,
-    fs.permission::text,
-    fs.created_at,
-    count(fi.id) as file_count
-  from public.folder_shares fs
-  inner join public.folders f on f.id = fs.folder_id
-  inner join public.users u on u.id = fs.owner_id
-  left join public.files fi on fi.folder_id = f.id and fi.is_deleted = false
-  where fs.shared_with_user_id = p_user_id
-  group by f.id, f.name, f.owner_id, u.email, fs.permission, fs.created_at
-  order by fs.created_at desc;
+    fr.folder_id,
+    fr.folder_name,
+    fr.owner_id,
+    fr.owner_email,
+    fr.permission,
+    fr.shared_at,
+    coalesce(file_counts.file_count, 0)::bigint as file_count,
+    coalesce(member_counts.member_count, 0)::bigint as member_count,
+    coalesce(member_counts.members, '[]'::jsonb) as members
+  from folder_rows fr
+  left join lateral (
+    select count(*)::bigint as file_count
+    from public.files fi
+    where fi.folder_id = fr.folder_id
+      and fi.is_deleted = false
+  ) as file_counts on true
+  left join lateral (
+    select
+      count(*)::bigint as member_count,
+      coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'user_id', m.user_id,
+            'email', m.email,
+            'permission', m.permission,
+            'accepted_at', m.accepted_at,
+            'role', m.role
+          )
+          order by m.sort_order, m.email
+        ),
+        '[]'::jsonb
+      ) as members
+    from (
+      select
+        fr.owner_id as user_id,
+        fr.owner_email as email,
+        'full'::text as permission,
+        null::timestamptz as accepted_at,
+        'owner'::text as role,
+        0 as sort_order
+      union all
+      select
+        fs2.shared_with_user_id as user_id,
+        u2.email as email,
+        fs2.permission::text as permission,
+        fs2.accepted_at,
+        'member'::text as role,
+        1 as sort_order
+      from public.folder_shares fs2
+      left join public.users u2 on u2.id = fs2.shared_with_user_id
+      where fs2.folder_id = fr.folder_id
+    ) as m
+  ) as member_counts on true
+  order by fr.shared_at desc nulls last, fr.folder_name asc;
+end;
+$$;
+
+-- 8b. Obtener snapshot de una carpeta para un usuario con acceso
+drop function if exists public.get_folder_browser_snapshot(uuid, uuid);
+create or replace function public.get_folder_browser_snapshot(
+  p_user_id uuid,
+  p_folder_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_folder_owner uuid;
+  v_access record;
+  v_folder_path jsonb := '[]'::jsonb;
+  v_folder_records jsonb := '[]'::jsonb;
+  v_folder_children jsonb := '[]'::jsonb;
+  v_files jsonb := '[]'::jsonb;
+begin
+  if p_folder_id is null then
+    return jsonb_build_object(
+      'current_folder_id', null,
+      'folder_path', '[]'::jsonb,
+      'all_folders', '[]'::jsonb,
+      'folders', '[]'::jsonb,
+      'files', '[]'::jsonb
+    );
+  end if;
+
+  select owner_id into v_folder_owner
+  from public.folders
+  where id = p_folder_id;
+
+  if v_folder_owner is null then
+    raise exception 'Folder not found';
+  end if;
+
+  select * into v_access
+  from public.user_has_folder_access(p_user_id, p_folder_id);
+
+  if not coalesce(v_access.has_access, false) then
+    raise exception 'Access denied';
+  end if;
+
+  with recursive path_tree as (
+    select id, owner_id, name, parent_id, created_at
+    from public.folders
+    where id = p_folder_id
+    union all
+    select f.id, f.owner_id, f.name, f.parent_id, f.created_at
+    from public.folders f
+    join path_tree p on p.parent_id = f.id
+  )
+  select coalesce(jsonb_agg(to_jsonb(path_tree) order by created_at), '[]'::jsonb)
+  into v_folder_path
+  from path_tree;
+
+  select coalesce(jsonb_agg(to_jsonb(f) order by f.created_at), '[]'::jsonb)
+  into v_folder_children
+  from public.folders f
+  where f.parent_id = p_folder_id
+    and exists (
+      select 1
+      from public.user_has_folder_access(p_user_id, f.id) as access_info
+      where access_info.has_access
+    );
+
+  select coalesce(jsonb_agg(to_jsonb(fi) order by fi.created_at desc), '[]'::jsonb)
+  into v_files
+  from public.files fi
+  where fi.folder_id = p_folder_id
+    and fi.is_deleted = false
+    and (
+      fi.owner_id = p_user_id
+      or exists (
+        select 1
+        from public.user_has_folder_access(p_user_id, p_folder_id) as access_info
+        where access_info.has_access
+      )
+    );
+
+  select coalesce(jsonb_agg(to_jsonb(f) order by f.created_at), '[]'::jsonb)
+  into v_folder_records
+  from public.folders f
+  where f.owner_id = v_folder_owner;
+
+  return jsonb_build_object(
+    'current_folder_id', p_folder_id,
+    'folder_path', v_folder_path,
+    'all_folders', v_folder_records,
+    'folders', v_folder_children,
+    'files', v_files
+  );
 end;
 $$;
 
@@ -358,9 +545,9 @@ declare
   v_deleted boolean;
 begin
   delete from public.folder_shares
-  where folder_id = p_folder_id
-    and owner_id = p_owner_id
-    and shared_with_user_id = p_shared_with_user_id
+  where public.folder_shares.folder_id = p_folder_id
+    and public.folder_shares.owner_id = p_owner_id
+    and public.folder_shares.shared_with_user_id = p_shared_with_user_id
   returning true into v_deleted;
   
   return coalesce(v_deleted, false);

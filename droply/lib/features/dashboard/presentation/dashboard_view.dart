@@ -1,8 +1,9 @@
+import 'dart:html' as html;
 import 'dart:math' as math;
 
+import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/dashboard/data/file_browser_repository.dart';
 import 'package:droply/features/dashboard/data/folder_sharing_repository.dart';
-import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -32,12 +33,20 @@ class _DashboardViewState extends State<DashboardView> {
   List<FolderShare>? _sharedFolders;
   bool _loadingSharedFolders = true;
   bool _isSendingInvitation = false;
+  String? _highlightedSharedFolderId;
+  bool _handledAcceptedFolder = false;
 
   @override
   void initState() {
     super.initState();
-    widget.controller.initialize();
-    _loadSharedFolders();
+    _highlightedSharedFolderId =
+        html.window.sessionStorage['droply_accepted_folder_id'];
+    _initializeDashboard();
+  }
+
+  Future<void> _initializeDashboard() async {
+    await widget.controller.initialize();
+    await _loadSharedFolders();
   }
 
   Future<void> _loadSharedFolders() async {
@@ -51,6 +60,7 @@ class _DashboardViewState extends State<DashboardView> {
           _loadingSharedFolders = false;
         });
       }
+      await _openAcceptedFolderIfNeeded(folders);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -59,6 +69,74 @@ class _DashboardViewState extends State<DashboardView> {
         });
       }
     }
+  }
+
+  Future<void> _openAcceptedFolderIfNeeded(List<FolderShare> folders) async {
+    if (_handledAcceptedFolder) {
+      return;
+    }
+
+    final acceptedFolderId =
+        html.window.sessionStorage['droply_accepted_folder_id'];
+    if (acceptedFolderId == null || acceptedFolderId.isEmpty) {
+      return;
+    }
+
+    final exists = folders.any((share) => share.folderId == acceptedFolderId);
+    if (!exists) {
+      return;
+    }
+
+    _handledAcceptedFolder = true;
+    html.window.sessionStorage.remove('droply_accepted_folder_id');
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _highlightedSharedFolderId = acceptedFolderId;
+    });
+    await widget.controller.openFolder(acceptedFolderId);
+  }
+
+  FolderShare? get _currentSharedFolder {
+    final currentFolderId = widget.controller.currentFolderId;
+    if (currentFolderId == null || _sharedFolders == null) {
+      return null;
+    }
+    for (final share in _sharedFolders!) {
+      final pathContainsShare = widget.controller.folderPath.any(
+        (folder) => folder.id == share.folderId,
+      );
+      if (share.folderId == currentFolderId || pathContainsShare) {
+        return share;
+      }
+    }
+    return null;
+  }
+
+  bool get _canCreateInCurrentFolder {
+    final share = _currentSharedFolder;
+    return share == null ||
+        share.permission == FolderPermission.upload ||
+        share.permission == FolderPermission.full;
+  }
+
+  bool get _canModifyCurrentFolder {
+    final share = _currentSharedFolder;
+    return share == null || share.permission == FolderPermission.full;
+  }
+
+  bool get _canDownloadInCurrentFolder {
+    final share = _currentSharedFolder;
+    return share == null ||
+        share.permission == FolderPermission.download ||
+        share.permission == FolderPermission.upload ||
+        share.permission == FolderPermission.full;
+  }
+
+  bool _canShareFolder(FolderItem folder) {
+    return folder.ownerId == widget.controller.currentUserId;
   }
 
   @override
@@ -96,6 +174,8 @@ class _DashboardViewState extends State<DashboardView> {
                             _DriveTopBar(
                               controller: controller,
                               authController: widget.authController,
+                              canCreateFolder: _canCreateInCurrentFolder,
+                              canUpload: _canCreateInCurrentFolder,
                               onCreateFolder: () =>
                                   _showFolderDialog(context, controller),
                               onUpload: () =>
@@ -106,6 +186,7 @@ class _DashboardViewState extends State<DashboardView> {
                             _Header(
                               controller: controller,
                               userEmail: widget.userEmail,
+                              sharedFolder: _currentSharedFolder,
                               onGoRoot: () => controller.openFolder(null),
                               onRefresh: controller.isBusy
                                   ? null
@@ -143,31 +224,12 @@ class _DashboardViewState extends State<DashboardView> {
                             ],
                             _SearchAndFilterBar(controller: controller),
                             const SizedBox(height: 20),
-                            
-                            // Sección de carpetas compartidas
-                            if (!_loadingSharedFolders && _sharedFolders != null && _sharedFolders!.isNotEmpty) ...[
-                              _SectionHeader(
-                                icon: Icons.folder_shared_rounded,
-                                title: 'Carpetas compartidas conmigo',
-                                subtitle: '${_sharedFolders!.length} carpeta${_sharedFolders!.length != 1 ? 's' : ''}',
+                            if (_currentSharedFolder != null) ...[
+                              _SharedFolderContextCard(
+                                share: _currentSharedFolder!,
                               ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                alignment: WrapAlignment.start,
-                                spacing: 16,
-                                runSpacing: 16,
-                                children: _sharedFolders!
-                                    .map(
-                                      (share) => _SharedFolderCard(
-                                        share: share,
-                                        onOpen: () => controller.openFolder(share.folderId),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
                             ],
-                            
                             _SectionHeader(
                               icon: Icons.folder_rounded,
                               title: 'Carpetas',
@@ -193,17 +255,22 @@ class _DashboardViewState extends State<DashboardView> {
                                         folder: folder,
                                         onOpen: () =>
                                             controller.openFolder(folder.id),
-                                        onRename: () => _showRenameFolderDialog(
-                                          context,
-                                          controller,
-                                          folder,
-                                        ),
-                                        onDelete: () =>
-                                            controller.deleteFolder(folder.id),
-                                        onShare: () => _shareFolderDialog(
-                                          context,
-                                          folder,
-                                        ),
+                                        onRename: _canModifyCurrentFolder
+                                            ? () => _showRenameFolderDialog(
+                                                  context,
+                                                  controller,
+                                                  folder,
+                                                )
+                                            : null,
+                                        onDelete: _canModifyCurrentFolder
+                                            ? () => controller.deleteFolder(folder.id)
+                                            : null,
+                                        onShare: _canShareFolder(folder)
+                                            ? () => _shareFolderDialog(
+                                                  context,
+                                                  folder,
+                                                )
+                                            : null,
                                       ),
                                     )
                                     .toList(),
@@ -254,42 +321,57 @@ class _DashboardViewState extends State<DashboardView> {
                                                 file,
                                               ),
                                               actions: [
-                                                _FileAction(
-                                                  label: 'Renombrar',
-                                                  icon: Icons.edit_outlined,
-                                                  onPressed: () =>
-                                                      _showRenameFileDialog(
-                                                        context,
-                                                        controller,
-                                                        file,
-                                                      ),
-                                                ),
-                                                _FileAction(
-                                                  label: 'Mover',
-                                                  icon: Icons
-                                                      .drive_file_move_outlined,
-                                                  onPressed: () =>
-                                                      _showMoveFileDialog(
-                                                        context,
-                                                        controller,
-                                                        file,
-                                                      ),
-                                                ),
-                                                _FileAction(
-                                                  label: 'Compartir',
-                                                  icon: Icons.share_outlined,
-                                                  onPressed: () => _shareFile(
-                                                    context,
-                                                    controller,
-                                                    file,
+                                                if (_canDownloadInCurrentFolder)
+                                                  _FileAction(
+                                                    label: 'Descargar',
+                                                    icon: Icons.download_outlined,
+                                                    onPressed: () =>
+                                                        _downloadSharedFile(
+                                                          context,
+                                                          file,
+                                                        ),
                                                   ),
-                                                ),
-                                                _FileAction(
-                                                  label: 'Eliminar',
-                                                  icon: Icons.delete_outline,
-                                                  onPressed: () => controller
-                                                      .deleteFile(file.id),
-                                                ),
+                                                if (_canModifyCurrentFolder)
+                                                  _FileAction(
+                                                    label: 'Renombrar',
+                                                    icon: Icons.edit_outlined,
+                                                    onPressed: () =>
+                                                        _showRenameFileDialog(
+                                                          context,
+                                                          controller,
+                                                          file,
+                                                        ),
+                                                  ),
+                                                if (_canModifyCurrentFolder)
+                                                  _FileAction(
+                                                    label: 'Mover',
+                                                    icon: Icons
+                                                        .drive_file_move_outlined,
+                                                    onPressed: () =>
+                                                        _showMoveFileDialog(
+                                                          context,
+                                                          controller,
+                                                          file,
+                                                        ),
+                                                  ),
+                                                if (file.ownerId ==
+                                                    controller.currentUserId)
+                                                  _FileAction(
+                                                    label: 'Compartir',
+                                                    icon: Icons.share_outlined,
+                                                    onPressed: () => _shareFile(
+                                                      context,
+                                                      controller,
+                                                      file,
+                                                    ),
+                                                  ),
+                                                if (_canModifyCurrentFolder)
+                                                  _FileAction(
+                                                    label: 'Eliminar',
+                                                    icon: Icons.delete_outline,
+                                                    onPressed: () => controller
+                                                        .deleteFile(file.id),
+                                                  ),
                                               ],
                                             ),
                                           ),
@@ -299,80 +381,55 @@ class _DashboardViewState extends State<DashboardView> {
                                 },
                               ),
                             const SizedBox(height: 24),
-                            _SectionHeader(
-                              icon: Icons.group_rounded,
-                              title: 'Compartidos conmigo',
-                              subtitle:
-                                  '${controller.sharedFiles.length} archivos aceptados',
-                            ),
-                            const SizedBox(height: 12),
-                            if (controller.sharedFiles.isEmpty)
-                              const _EmptyState(
-                                icon: Icons.link_off_rounded,
-                                title: 'Sin compartidos aceptados',
-                                label:
-                                    'Los archivos compartidos contigo apareceran aqui.',
-                              )
-                            else
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final columns = constraints.maxWidth >= 1100
-                                      ? 3
-                                      : constraints.maxWidth >= 700
-                                      ? 2
-                                      : 1;
-                                  return Wrap(
-                                    alignment: WrapAlignment.start,
-                                    spacing: 16,
-                                    runSpacing: 16,
-                                    children: controller.sharedFiles
-                                        .map(
-                                          (file) => SizedBox(
-                                            width: _cardWidth(
-                                              constraints.maxWidth,
-                                              columns,
-                                            ),
-                                            child: _FileCard(
-                                              title: file.name,
-                                              subtitle: _formatBytes(
-                                                file.sizeBytes,
-                                              ),
-                                              icon: _iconForFile(file),
-                                              accent: const Color(0xFF1D4ED8),
-                                              onTap: () => _openFilePreview(
-                                                context,
-                                                file,
-                                              ),
-                                              actions: [
-                                                _FileAction(
-                                                  label: 'Descargar',
-                                                  icon: Icons.download_outlined,
-                                                  onPressed: () =>
-                                                      _downloadSharedFile(
-                                                        context,
-                                                        file,
-                                                      ),
-                                                ),
-                                                _FileAction(
-                                                  label: 'Quitar',
-                                                  icon: Icons
-                                                      .remove_circle_outline,
-                                                  onPressed:
-                                                      file.shareId == null
-                                                      ? null
-                                                      : () => controller
-                                                            .removeSharedFile(
-                                                              file.shareId!,
-                                                            ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                  );
-                                },
+                            if (controller.currentFolderId == null) ...[
+                              _SectionHeader(
+                                icon: Icons.folder_shared_rounded,
+                                title: 'Carpetas compartidas',
+                                subtitle:
+                                    '${_sharedFolders?.length ?? 0} carpeta${(_sharedFolders?.length ?? 0) == 1 ? '' : 's'}',
                               ),
+                              const SizedBox(height: 12),
+                              if (_sharedFolders == null || _sharedFolders!.isEmpty)
+                                const _EmptyState(
+                                  icon: Icons.folder_off_outlined,
+                                  title: 'Sin carpetas compartidas',
+                                  label:
+                                      'Las carpetas compartidas apareceran aqui cuando las aceptes o crees.',
+                                )
+                              else
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final columns = constraints.maxWidth >= 1100
+                                        ? 3
+                                        : constraints.maxWidth >= 700
+                                        ? 2
+                                        : 1;
+                                    return Wrap(
+                                      alignment: WrapAlignment.start,
+                                      spacing: 16,
+                                      runSpacing: 16,
+                                      children: _sharedFolders!
+                                          .map(
+                                            (share) => SizedBox(
+                                              width: _cardWidth(
+                                                constraints.maxWidth,
+                                                columns,
+                                              ),
+                                              child: _SharedFolderCard(
+                                                share: share,
+                                                isHighlighted:
+                                                    share.folderId ==
+                                                        _highlightedSharedFolderId,
+                                                onOpen: () => controller.openFolder(share.folderId),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    );
+                                  },
+                                ),
+                              const SizedBox(height: 24),
+                            ],
                           ],
                         ),
                 ),
@@ -1026,10 +1083,15 @@ class _DashboardViewState extends State<DashboardView> {
     FileItem file,
   ) async {
     final folders = controller.allFolders;
+    final canMoveToRoot = file.ownerId == controller.currentUserId;
     await showDialog<void>(
       context: context,
       builder: (context) {
         String? selectedFolderId = file.folderId;
+        if (!canMoveToRoot &&
+            !folders.any((folder) => folder.id == selectedFolderId)) {
+          selectedFolderId = folders.isEmpty ? null : folders.first.id;
+        }
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
@@ -1041,10 +1103,11 @@ class _DashboardViewState extends State<DashboardView> {
                     : null,
                 decoration: const InputDecoration(labelText: 'Carpeta destino'),
                 items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Raiz'),
-                  ),
+                  if (canMoveToRoot)
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Raiz'),
+                    ),
                   ...folders.map(
                     (folder) => DropdownMenuItem<String?>(
                       value: folder.id,
@@ -1898,6 +1961,8 @@ class _DriveTopBar extends StatelessWidget {
   const _DriveTopBar({
     required this.controller,
     required this.authController,
+    required this.canCreateFolder,
+    required this.canUpload,
     required this.onCreateFolder,
     required this.onUpload,
     required this.onSignOut,
@@ -1905,6 +1970,8 @@ class _DriveTopBar extends StatelessWidget {
 
   final DashboardController controller;
   final AuthController authController;
+  final bool canCreateFolder;
+  final bool canUpload;
   final VoidCallback onCreateFolder;
   final VoidCallback onUpload;
   final VoidCallback onSignOut;
@@ -1946,12 +2013,13 @@ class _DriveTopBar extends StatelessWidget {
               _TopBarButton(
                 label: 'Carpeta',
                 icon: Icons.create_new_folder_outlined,
-                onPressed: controller.isBusy ? null : onCreateFolder,
+                onPressed:
+                    controller.isBusy || !canCreateFolder ? null : onCreateFolder,
               ),
               _TopBarButton(
                 label: 'Subir',
                 icon: Icons.cloud_upload_outlined,
-                onPressed: controller.isBusy ? null : onUpload,
+                onPressed: controller.isBusy || !canUpload ? null : onUpload,
                 filled: true,
               ),
               _TopBarButton(
@@ -2044,6 +2112,7 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.controller,
     required this.userEmail,
+    required this.sharedFolder,
     required this.onGoRoot,
     required this.onRefresh,
     required this.theme,
@@ -2051,6 +2120,7 @@ class _Header extends StatelessWidget {
 
   final DashboardController controller;
   final String userEmail;
+  final FolderShare? sharedFolder;
   final VoidCallback onGoRoot;
   final VoidCallback? onRefresh;
   final ThemeData theme;
@@ -2129,6 +2199,10 @@ class _Header extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
+                if (sharedFolder != null) ...[
+                  const SizedBox(height: 16),
+                  _SharedFolderMembersBar(share: sharedFolder!),
+                ],
               ],
             ),
           ),
@@ -2589,25 +2663,261 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+class _SharedFolderMembersBar extends StatelessWidget {
+  const _SharedFolderMembersBar({
+    required this.share,
+  });
+
+  final FolderShare share;
+
+  @override
+  Widget build(BuildContext context) {
+    final members = share.members ?? const [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.groups_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Miembros de esta carpeta',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '${members.length} usuarios',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MiniMemberChip(
+                label: '${share.ownerEmail ?? 'Propietario'} · dueño',
+                icon: Icons.person,
+              ),
+              ...members.map((member) {
+                final email = member['email'] as String? ?? 'usuario';
+                final permission = member['permission'] as String? ?? 'view';
+                return _MiniMemberChip(
+                  label: '$email · $permission',
+                  icon: Icons.person_outline,
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniMemberChip extends StatelessWidget {
+  const _MiniMemberChip({
+    required this.label,
+    required this.icon,
+  });
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SharedFolderContextCard extends StatelessWidget {
+  const _SharedFolderContextCard({
+    required this.share,
+  });
+
+  final FolderShare share;
+
+  @override
+  Widget build(BuildContext context) {
+    final members = share.members ?? const [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD7E2F2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.folder_shared_rounded, color: Color(0xFF0EA5E9)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  share.folderName ?? 'Carpeta compartida',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Compartida por ${share.ownerEmail ?? 'usuario'} · ${share.permission.displayName}',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _SmallInfoChip(
+                icon: Icons.group_outlined,
+                label: '${share.memberCount ?? members.length} miembros',
+              ),
+              _SmallInfoChip(
+                icon: Icons.security_outlined,
+                label: 'Acceso compartido',
+              ),
+            ],
+          ),
+          if (members.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Miembros',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: members.map((member) {
+                final email = member['email'] as String? ?? 'usuario';
+                final permission = member['permission'] as String? ?? 'view';
+                return Chip(
+                  label: Text('$email · $permission'),
+                  avatar: const Icon(Icons.person_outline, size: 18),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallInfoChip extends StatelessWidget {
+  const _SmallInfoChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF0F172A)),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SharedFolderCard extends StatelessWidget {
   const _SharedFolderCard({
     required this.share,
+    required this.isHighlighted,
     required this.onOpen,
   });
 
   final FolderShare share;
+  final bool isHighlighted;
   final VoidCallback onOpen;
 
   String _getPermissionIcon(FolderPermission permission) {
     switch (permission) {
       case FolderPermission.view:
-        return '👁️';
+        return 'ðï¸';
       case FolderPermission.download:
-        return '📥';
+        return 'ð¥';
       case FolderPermission.upload:
-        return '📤';
+        return 'ð¤';
       case FolderPermission.full:
-        return '🔑';
+        return 'ð';
     }
   }
 
@@ -2638,19 +2948,23 @@ class _SharedFolderCard extends StatelessWidget {
             _getPermissionColor(share.permission).withOpacity(0.05),
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: _getPermissionColor(share.permission).withOpacity(0.3),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _getPermissionColor(share.permission).withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isHighlighted
+                ? const Color(0xFFF59E0B)
+                : _getPermissionColor(share.permission).withOpacity(0.3),
+            width: isHighlighted ? 3 : 2,
           ),
-        ],
-      ),
+          boxShadow: [
+            BoxShadow(
+              color: isHighlighted
+                  ? const Color(0xFFF59E0B).withOpacity(0.22)
+                  : _getPermissionColor(share.permission).withOpacity(0.1),
+              blurRadius: isHighlighted ? 24 : 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2739,6 +3053,35 @@ class _SharedFolderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          if (isHighlighted) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text(
+                'Invitacion aceptada',
+                style: TextStyle(
+                  color: Color(0xFF92400E),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if ((share.memberCount ?? 0) > 0) ...[
+            Text(
+              '${share.memberCount} miembros',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -2779,9 +3122,9 @@ class _FolderCard extends StatefulWidget {
 
   final FolderItem folder;
   final VoidCallback onOpen;
-  final VoidCallback onRename;
-  final VoidCallback onDelete;
-  final VoidCallback onShare;
+  final VoidCallback? onRename;
+  final VoidCallback? onDelete;
+  final VoidCallback? onShare;
 
   @override
   State<_FolderCard> createState() => _FolderCardState();
@@ -3002,7 +3345,7 @@ class _FolderCardState extends State<_FolderCard> {
   Widget _buildActionButton({
     required String tooltip,
     required IconData icon,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required Color color,
     bool isDanger = false,
   }) {
@@ -3034,13 +3377,17 @@ class _FolderCardState extends State<_FolderCard> {
               border: Border.all(
                 color: isDanger
                     ? const Color(0xFFFFD7D1)
-                    : color.withValues(alpha: 0.25),
+                    : color.withValues(alpha: onPressed == null ? 0.10 : 0.25),
                 width: 1.5,
               ),
             ),
             child: Icon(
               icon,
-              color: isDanger ? const Color(0xFFB42318) : color,
+              color: onPressed == null
+                  ? const Color(0xFF94A3B8)
+                  : isDanger
+                      ? const Color(0xFFB42318)
+                      : color,
               size: 20,
             ),
           ),

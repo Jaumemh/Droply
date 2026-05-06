@@ -58,6 +58,8 @@ class FolderShare {
     this.folderName,
     this.ownerEmail,
     this.sharedWithEmail,
+    this.memberCount,
+    this.members,
   });
 
   factory FolderShare.fromMap(Map<String, dynamic> map) {
@@ -75,6 +77,10 @@ class FolderShare {
       folderName: map['folder_name'] as String?,
       ownerEmail: map['owner_email'] as String?,
       sharedWithEmail: map['shared_with_email'] as String?,
+      memberCount: map['member_count'] is num ? (map['member_count'] as num).toInt() : null,
+      members: (map['members'] as List<dynamic>?)
+          ?.map((entry) => Map<String, dynamic>.from(entry as Map))
+          .toList(),
     );
   }
 
@@ -89,6 +95,8 @@ class FolderShare {
   final String? folderName;
   final String? ownerEmail;
   final String? sharedWithEmail;
+  final int? memberCount;
+  final List<Map<String, dynamic>>? members;
 }
 
 /// Modelo para una invitación pendiente
@@ -292,7 +300,7 @@ class FolderSharingRepository {
     return response.map((e) {
       final map = e as Map<String, dynamic>;
       return FolderShare(
-        id: '', // No disponible en este query
+        id: map['folder_id'] as String,
         folderId: map['folder_id'] as String,
         ownerId: map['owner_id'] as String,
         sharedWithUserId: userId,
@@ -301,7 +309,37 @@ class FolderSharingRepository {
         createdAt: DateTime.parse(map['shared_at'] as String),
         folderName: map['folder_name'] as String,
         ownerEmail: map['owner_email'] as String,
+        memberCount: map['member_count'] is num ? (map['member_count'] as num).toInt() : null,
+        members: (map['members'] as List<dynamic>?)
+            ?.map((entry) => Map<String, dynamic>.from(entry as Map))
+            .toList(),
       );
+    }).toList();
+  }
+
+  Future<List<FolderShare>> getFolderMembers(String folderId) async {
+    final response = await _supabase
+        .from('folder_shares')
+        .select('''
+          id,
+          folder_id,
+          owner_id,
+          shared_with_user_id,
+          permission,
+          inherit_to_subfolders,
+          created_at,
+          accepted_at,
+          users!shared_with_user_id(email)
+        ''')
+        .eq('folder_id', folderId)
+        .order('created_at', ascending: true);
+
+    return (response as List<dynamic>).map((e) {
+      final map = e as Map<String, dynamic>;
+      return FolderShare.fromMap({
+        ...map,
+        'shared_with_email': map['users']?['email'],
+      });
     }).toList();
   }
 

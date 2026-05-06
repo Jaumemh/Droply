@@ -154,6 +154,30 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
   Future<FileBrowserSnapshot> load({
     String? folderId,
   }) async {
+    if (folderId != null) {
+      final snapshot = await _client.rpc(
+        'get_folder_browser_snapshot',
+        params: {
+          'p_user_id': currentUserId,
+          'p_folder_id': folderId,
+        },
+      );
+
+      final map = Map<String, dynamic>.from(snapshot as Map);
+      final allFolders = _mapFolders(map['all_folders']);
+      final folders = _mapFolders(map['folders']);
+      final files = _mapFiles(map['files']);
+
+      return FileBrowserSnapshot(
+        currentFolderId: folderId,
+        folderPath: _mapFolders(map['folder_path']),
+        allFolders: allFolders,
+        folders: folders,
+        files: files,
+        sharedFiles: await loadSharedFiles(),
+      );
+    }
+
     final foldersQuery = await _client
         .from('folders')
         .select('id, owner_id, name, parent_id, created_at')
@@ -190,6 +214,18 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     required String name,
     String? parentId,
   }) async {
+    if (parentId != null) {
+      await _client.rpc(
+        'create_collaborative_folder',
+        params: {
+          'p_user_id': currentUserId,
+          'p_parent_id': parentId,
+          'p_name': name.trim(),
+        },
+      );
+      return;
+    }
+
     await _client.from('folders').insert({
       'owner_id': currentUserId,
       'name': name.trim(),
@@ -202,16 +238,27 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     required String folderId,
     required String newName,
   }) async {
-    await _client
-        .from('folders')
-        .update({'name': newName.trim()}).eq('id', folderId).eq('owner_id', currentUserId);
+    await _client.rpc(
+      'rename_collaborative_folder',
+      params: {
+        'p_user_id': currentUserId,
+        'p_folder_id': folderId,
+        'p_new_name': newName.trim(),
+      },
+    );
   }
 
   @override
   Future<void> deleteFolder({
     required String folderId,
   }) async {
-    await _client.from('folders').delete().eq('id', folderId).eq('owner_id', currentUserId);
+    await _client.rpc(
+      'delete_collaborative_folder',
+      params: {
+        'p_user_id': currentUserId,
+        'p_folder_id': folderId,
+      },
+    );
   }
 
   @override
@@ -228,6 +275,16 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     const maxSizeBytes = 50 * 1024 * 1024;
     if (sizeBytes > maxSizeBytes) {
       throw StateError('El archivo supera el limite de 50 MB.');
+    }
+
+    if (folderId != null) {
+      await _ensureFolderPermission(
+        folderId: folderId,
+        allowedPermissions: const {
+          'upload',
+          'full',
+        },
+      );
     }
 
     final signedUpload = await _client.storage
@@ -276,39 +333,61 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
         throw StateError('Error subiendo a Storage: ${response.statusCode} $body');
       }
 
-      final inserted = await _client
-          .from('files')
-          .insert({
-            'owner_id': currentUserId,
-            'folder_id': folderId,
-            'name': name.trim(),
-            'extension': extension,
-            'size_bytes': sizeBytes,
-            'mime_type': mimeType.trim(),
-            'storage_path': storagePath.trim(),
-            'version': 1,
-            'is_deleted': false,
-          })
-          .select(
-            'id, owner_id, folder_id, name, extension, size_bytes, mime_type, storage_path, version, is_deleted, created_at',
-          )
-          .single();
+      final dynamic inserted;
+      if (folderId == null) {
+        inserted = await _client
+            .from('files')
+            .insert({
+              'owner_id': currentUserId,
+              'folder_id': folderId,
+              'name': name.trim(),
+              'extension': extension,
+              'size_bytes': sizeBytes,
+              'mime_type': mimeType.trim(),
+              'storage_path': storagePath.trim(),
+              'version': 1,
+              'is_deleted': false,
+            })
+            .select(
+              'id, owner_id, folder_id, name, extension, size_bytes, mime_type, storage_path, version, is_deleted, created_at',
+            )
+            .single();
+      } else {
+        final response = await _client.rpc(
+          'create_collaborative_file',
+          params: {
+            'p_user_id': currentUserId,
+            'p_folder_id': folderId,
+            'p_name': name.trim(),
+            'p_extension': extension,
+            'p_size_bytes': sizeBytes,
+            'p_mime_type': mimeType.trim(),
+            'p_storage_path': storagePath.trim(),
+          },
+        ) as List<dynamic>;
+        if (response.isEmpty) {
+          throw StateError('No se pudo registrar el archivo compartido.');
+        }
+        inserted = response.first;
+      }
 
       final file = FileItem.fromMap(Map<String, dynamic>.from(inserted as Map));
 
-      await _client.from('events').insert({
-        'user_id': currentUserId,
-        'file_id': file.id,
-        'action': 'UPLOAD',
-        'target_type': 'file',
-        'metadata': {
-          'size_bytes': sizeBytes,
-          'storage_path': storagePath,
-          'mime_type': mimeType,
-          'elapsed_ms': stopwatch.elapsedMilliseconds,
-          'folder_id': folderId,
-        },
-      });
+      if (folderId == null) {
+        await _client.from('events').insert({
+          'user_id': currentUserId,
+          'file_id': file.id,
+          'action': 'UPLOAD',
+          'target_type': 'file',
+          'metadata': {
+            'size_bytes': sizeBytes,
+            'storage_path': storagePath,
+            'mime_type': mimeType,
+            'elapsed_ms': stopwatch.elapsedMilliseconds,
+            'folder_id': folderId,
+          },
+        });
+      }
 
       onProgress(
         UploadProgress(
@@ -330,9 +409,14 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     required String fileId,
     required String newName,
   }) async {
-    await _client
-        .from('files')
-        .update({'name': newName.trim()}).eq('id', fileId).eq('owner_id', currentUserId);
+    await _client.rpc(
+      'rename_collaborative_file',
+      params: {
+        'p_user_id': currentUserId,
+        'p_file_id': fileId,
+        'p_new_name': newName.trim(),
+      },
+    );
   }
 
   @override
@@ -340,39 +424,27 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
     required String fileId,
     String? folderId,
   }) async {
-    await _client
-        .from('files')
-        .update({'folder_id': folderId}).eq('id', fileId).eq('owner_id', currentUserId);
+    await _client.rpc(
+      'move_collaborative_file',
+      params: {
+        'p_user_id': currentUserId,
+        'p_file_id': fileId,
+        'p_target_folder_id': folderId,
+      },
+    );
   }
 
   @override
   Future<void> deleteFile({
     required String fileId,
   }) async {
-    final file = await _client
-        .from('files')
-        .select('id, storage_path')
-        .eq('id', fileId)
-        .eq('owner_id', currentUserId)
-        .single();
-    final map = Map<String, dynamic>.from(file as Map);
-    final storagePath = map['storage_path'] as String;
-
-    await _client.storage.from('droply-files').remove([storagePath]);
-
-    await _client
-        .from('files')
-        .update({'is_deleted': true}).eq('id', fileId).eq('owner_id', currentUserId);
-
-    await _client.from('events').insert({
-      'user_id': currentUserId,
-      'file_id': fileId,
-      'action': 'DELETE',
-      'target_type': 'file',
-      'metadata': {
-        'storage_path': storagePath,
+    await _client.rpc(
+      'delete_collaborative_file',
+      params: {
+        'p_user_id': currentUserId,
+        'p_file_id': fileId,
       },
-    });
+    );
   }
 
   @override
@@ -408,12 +480,23 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
   }
 
   List<FolderItem> _mapFolders(dynamic foldersQuery) {
+    if (foldersQuery == null) {
+      return const [];
+    }
+
     return (foldersQuery as List<dynamic>)
-        .map((row) => FolderItem.fromMap(Map<String, dynamic>.from(row as Map)))
+        .map((row) {
+          final map = Map<String, dynamic>.from(row as Map);
+          return FolderItem.fromMap(map);
+        })
         .toList();
   }
 
   List<FileItem> _mapFiles(dynamic filesQuery) {
+    if (filesQuery == null) {
+      return const [];
+    }
+
     return (filesQuery as List<dynamic>)
         .map((row) => FileItem.fromMap(Map<String, dynamic>.from(row as Map)))
         .toList();
@@ -446,5 +529,29 @@ class FileBrowserRepository extends FileBrowserRepositoryBase {
 
     final remainingMs = ((total - transferred) / rate).round();
     return Duration(milliseconds: remainingMs);
+  }
+
+  Future<void> _ensureFolderPermission({
+    required String folderId,
+    required Set<String> allowedPermissions,
+  }) async {
+    final response = await _client.rpc(
+      'user_has_folder_access',
+      params: {
+        'p_user_id': currentUserId,
+        'p_folder_id': folderId,
+      },
+    ) as List<dynamic>;
+
+    if (response.isEmpty) {
+      throw StateError('No tienes permisos para esta carpeta.');
+    }
+
+    final access = Map<String, dynamic>.from(response.first as Map);
+    final hasAccess = access['has_access'] as bool? ?? false;
+    final permission = access['permission'] as String?;
+    if (!hasAccess || !allowedPermissions.contains(permission)) {
+      throw StateError('No tienes permisos para subir a esta carpeta.');
+    }
   }
 }
