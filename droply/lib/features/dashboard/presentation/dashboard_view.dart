@@ -415,7 +415,7 @@ class _DashboardViewState extends State<DashboardView> {
                                                 constraints.maxWidth,
                                                 columns,
                                               ),
-                                              child: _SharedFolderCard(
+                                              child: _SharedFolderHoverCard(
                                                 share: share,
                                                 isHighlighted:
                                                     share.folderId ==
@@ -2897,6 +2897,317 @@ class _SmallInfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SharedFolderHoverCard extends StatefulWidget {
+  const _SharedFolderHoverCard({
+    required this.share,
+    required this.isHighlighted,
+    required this.onOpen,
+  });
+
+  final FolderShare share;
+  final bool isHighlighted;
+  final VoidCallback onOpen;
+
+  @override
+  State<_SharedFolderHoverCard> createState() => _SharedFolderHoverCardState();
+}
+
+class _SharedFolderHoverCardState extends State<_SharedFolderHoverCard> {
+  bool _isHovered = false;
+
+  Color _permissionColor(FolderPermission permission) {
+    switch (permission) {
+      case FolderPermission.view:
+        return const Color(0xFF6B7280);
+      case FolderPermission.download:
+        return const Color(0xFF0EA5E9);
+      case FolderPermission.upload:
+        return const Color(0xFF8B5CF6);
+      case FolderPermission.full:
+        return const Color(0xFF10B981);
+    }
+  }
+
+  IconData _permissionIcon(FolderPermission permission) {
+    switch (permission) {
+      case FolderPermission.view:
+        return Icons.visibility_outlined;
+      case FolderPermission.download:
+        return Icons.download_outlined;
+      case FolderPermission.upload:
+        return Icons.cloud_upload_outlined;
+      case FolderPermission.full:
+        return Icons.admin_panel_settings_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final share = widget.share;
+    final accent = _permissionColor(share.permission);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.identity()
+          ..translate(0.0, _isHovered ? -6.0 : 0.0),
+        width: 280,
+        child: Card(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(
+              color: widget.isHighlighted
+                  ? const Color(0xFFF59E0B)
+                  : _isHovered
+                      ? accent.withValues(alpha: 0.42)
+                      : const Color(0xFFD7E2F2),
+              width: widget.isHighlighted || _isHovered ? 2 : 1.5,
+            ),
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: _isHovered
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accent.withValues(alpha: 0.04),
+                        accent.withValues(alpha: 0.10),
+                      ],
+                    )
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white,
+                        accent.withValues(alpha: 0.04),
+                      ],
+                    ),
+              boxShadow: _isHovered || widget.isHighlighted
+                  ? [
+                      BoxShadow(
+                        color: (widget.isHighlighted
+                                ? const Color(0xFFF59E0B)
+                                : accent)
+                            .withValues(alpha: 0.16),
+                        blurRadius: 22,
+                        offset: const Offset(0, 10),
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.07),
+                        blurRadius: 38,
+                        offset: const Offset(0, 18),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: const Color(0xFF64748B).withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+            ),
+            child: InkWell(
+              onTap: widget.onOpen,
+              borderRadius: BorderRadius.circular(22),
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: _isHovered
+                                  ? [
+                                      accent,
+                                      accent.withValues(alpha: 0.82),
+                                    ]
+                                  : [
+                                      accent.withValues(alpha: 0.14),
+                                      accent.withValues(alpha: 0.22),
+                                    ],
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: accent.withValues(
+                                alpha: _isHovered ? 0.35 : 0.22,
+                              ),
+                              width: 1.5,
+                            ),
+                            boxShadow: _isHovered
+                                ? [
+                                    BoxShadow(
+                                      color: accent.withValues(alpha: 0.25),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Icon(
+                            _isHovered
+                                ? Icons.folder_open_rounded
+                                : Icons.folder_shared_rounded,
+                            color: _isHovered ? Colors.white : accent,
+                            size: _isHovered ? 34 : 30,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                share.folderName ?? 'Carpeta compartida',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF172033),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Por ${share.ownerEmail ?? 'usuario'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF6F8FB),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFFE3EAF5),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _permissionIcon(share.permission),
+                            size: 17,
+                            color: accent,
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            share.permission.displayName,
+                            style: TextStyle(
+                              color: accent,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.isHighlighted) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Invitacion aceptada',
+                          style: TextStyle(
+                            color: Color(0xFF92400E),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if ((share.memberCount ?? 0) > 0) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        '${share.memberCount} miembros',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _isHovered
+                            ? accent
+                            : accent.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.folder_open_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Abrir carpeta',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
