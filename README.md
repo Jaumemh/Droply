@@ -16,7 +16,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-RLS-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![License](https://img.shields.io/badge/Licencia-Confidencial-red?style=for-the-badge)](LICENSE)
 
-*Trabajo de Fin de Grado · Ciclo Formativo de Grado Superior en Desarrollo de Aplicaciones Multiplataforma (DAM) · Abril 2026*
+*Trabajo de Fin de Grado · Ciclo Formativo de Grado Superior en Desarrollo de Aplicaciones Multiplataforma (DAM) · Abril 2026 · Jaume Montagud Henandis*
 
 </div>
 
