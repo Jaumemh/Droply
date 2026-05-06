@@ -2676,7 +2676,11 @@ class _SharedFolderMembersBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final members = share.members ?? const [];
+    // Filtrar miembros para excluir al propietario (evitar duplicación)
+    final allMembers = share.members ?? const [];
+    final members = allMembers
+        .where((member) => member['email'] != share.ownerEmail)
+        .toList();
 
     return Container(
       width: double.infinity,
@@ -2703,7 +2707,7 @@ class _SharedFolderMembersBar extends StatelessWidget {
                 ),
               ),
               Text(
-                '${members.isEmpty ? 1 : members.length} usuarios',
+                '${members.length + 1} miembros',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: Colors.white.withValues(alpha: 0.85),
                   fontWeight: FontWeight.w700,
@@ -2716,9 +2720,8 @@ class _SharedFolderMembersBar extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (members.isEmpty)
               _MiniMemberChip(
-                label: '${share.ownerEmail ?? 'Propietario'} · dueño',
+                label: '${share.ownerEmail ?? 'Propietario'} · ADMIN',
                 icon: Icons.person,
               ),
               ...members.map((member) {
