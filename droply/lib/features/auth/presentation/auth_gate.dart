@@ -6,7 +6,7 @@ import 'package:droply/features/dashboard/presentation/dashboard_controller.dart
 import 'package:droply/features/dashboard/presentation/accept_folder_invitation_page.dart';
 import 'package:droply/features/onboarding/presentation/droply_intro_page.dart';
 import 'package:flutter/material.dart';
-import 'dart:html' as html;
+import 'package:droply/core/platform_utils.dart' as platform_utils;
 
 class AuthGate extends StatefulWidget {
   const AuthGate({
@@ -37,7 +37,7 @@ class _AuthGateState extends State<AuthGate> {
       animation: widget.controller,
       builder: (context, _) {
         final pendingInvitationToken =
-            html.window.sessionStorage['droply_pending_invitation_token'];
+            platform_utils.sessionStorageGet('droply_pending_invitation_token');
         final hasPendingInvitation =
             pendingInvitationToken != null && pendingInvitationToken.isNotEmpty;
 

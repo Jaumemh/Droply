@@ -1,5 +1,8 @@
-import 'dart:html' as html;
 import 'dart:math' as math;
+import 'package:droply/core/platform_utils.dart' as platform_utils;
+import 'package:droply/features/sharing/presentation/pdf_viewer_web.dart'
+    if (dart.library.io) 'package:droply/features/sharing/presentation/pdf_viewer_stub.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:droply/features/auth/auth_controller.dart';
 import 'package:droply/features/dashboard/data/file_browser_repository.dart';
@@ -35,13 +38,60 @@ class _DashboardViewState extends State<DashboardView> {
   bool _isSendingInvitation = false;
   String? _highlightedSharedFolderId;
   bool _handledAcceptedFolder = false;
+  RealtimeChannel? _folderSharesChannel;
 
   @override
   void initState() {
     super.initState();
     _highlightedSharedFolderId =
-        html.window.sessionStorage['droply_accepted_folder_id'];
+        platform_utils.sessionStorageGet('droply_accepted_folder_id');
     _initializeDashboard();
+    _subscribeToFolderShares();
+  }
+
+  void _subscribeToFolderShares() {
+    final supabase = Supabase.instance.client;
+    _folderSharesChannel = supabase
+        .channel('folder_shares_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'folder_shares',
+          callback: (payload) {
+            if (mounted) _loadSharedFolders();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'folder_shares',
+          callback: (payload) {
+            if (mounted) {
+              _loadSharedFolders();
+              // Si el usuario estaba dentro de la carpeta eliminada, volver al raíz
+              final deletedFolderId = payload.oldRecord['folder_id'] as String?;
+              if (deletedFolderId != null &&
+                  widget.controller.folderPath.any((f) => f.id == deletedFolderId)) {
+                widget.controller.openFolder(null);
+              }
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'folder_shares',
+          callback: (payload) {
+            if (mounted) _loadSharedFolders();
+          },
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _folderSharesChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _initializeDashboard() async {
@@ -77,7 +127,7 @@ class _DashboardViewState extends State<DashboardView> {
     }
 
     final acceptedFolderId =
-        html.window.sessionStorage['droply_accepted_folder_id'];
+        platform_utils.sessionStorageGet('droply_accepted_folder_id');
     if (acceptedFolderId == null || acceptedFolderId.isEmpty) {
       return;
     }
@@ -88,7 +138,7 @@ class _DashboardViewState extends State<DashboardView> {
     }
 
     _handledAcceptedFolder = true;
-    html.window.sessionStorage.remove('droply_accepted_folder_id');
+    platform_utils.sessionStorageRemove('droply_accepted_folder_id');
     if (!mounted) {
       return;
     }
@@ -605,12 +655,14 @@ class _DashboardViewState extends State<DashboardView> {
         fit: StackFit.expand,
         children: [
           const Center(child: CircularProgressIndicator()),
-          SfPdfViewer.network(
-            signedUrl,
-            canShowScrollHead: false,
-            canShowScrollStatus: false,
-            canShowPaginationDialog: false,
-          ),
+          kIsWeb
+              ? PdfViewerWeb(pdfUrl: signedUrl, allowDownload: true)
+              : SfPdfViewer.network(
+                  signedUrl,
+                  canShowScrollHead: false,
+                  canShowScrollStatus: false,
+                  canShowPaginationDialog: false,
+                ),
         ],
       );
     }
@@ -918,10 +970,12 @@ class _DashboardViewState extends State<DashboardView> {
                         children: [
                           Icon(label.$2, size: 20, color: const Color(0xFF10B981)),
                           const SizedBox(width: 8),
-                          Text(
-                            label.$1,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Text(
+                              label.$1,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
@@ -1298,19 +1352,21 @@ class _DashboardViewState extends State<DashboardView> {
                             selectedPermission = value!;
                           });
                         },
-                        title: const Row(
+                        title: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.visibility_outlined,
                               size: 20,
                               color: Color(0xFF8B5CF6),
                             ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Solo visualizar',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
+                            const SizedBox(width: 10),
+                            const Flexible(
+                              child: Text(
+                                'Solo visualizar',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ],
@@ -1337,19 +1393,21 @@ class _DashboardViewState extends State<DashboardView> {
                             selectedPermission = value!;
                           });
                         },
-                        title: const Row(
+                        title: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.download_outlined,
                               size: 20,
                               color: Color(0xFF10B981),
                             ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Visualizar y descargar',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
+                            const SizedBox(width: 10),
+                            const Flexible(
+                              child: Text(
+                                'Visualizar y descargar',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ],

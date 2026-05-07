@@ -1,6 +1,6 @@
 import 'package:droply/features/dashboard/data/folder_sharing_repository.dart';
 import 'package:flutter/material.dart';
-import 'dart:html' as html;
+import 'package:droply/core/platform_utils.dart' as platform_utils;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AcceptFolderInvitationPage extends StatefulWidget {
@@ -94,10 +94,10 @@ class _AcceptFolderInvitationPageState extends State<AcceptFolderInvitationPage>
 
     try {
       final result = await _repository.acceptInvitation(token: widget.token);
-      html.window.sessionStorage.remove('droply_pending_invitation_token');
-      html.window.sessionStorage['droply_accepted_folder_id'] = result.folderId;
+      platform_utils.sessionStorageRemove('droply_pending_invitation_token');
+      platform_utils.sessionStorageSet('droply_accepted_folder_id', result.folderId);
       if (!mounted) return;
-      html.window.location.assign(Uri.base.origin);
+      platform_utils.locationAssign(Uri.base.origin);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -170,9 +170,8 @@ class _AcceptFolderInvitationPageState extends State<AcceptFolderInvitationPage>
               ),
             ),
             onPressed: () {
-              html.window.sessionStorage['droply_pending_invitation_token'] =
-                  widget.token;
-              html.window.location.assign(Uri.base.origin);
+              platform_utils.sessionStorageSet('droply_pending_invitation_token', widget.token);
+              platform_utils.locationAssign(Uri.base.origin);
             },
             child: const Text(
               'Ir a login',
